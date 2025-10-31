@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "Bash(nul)",
+      "Bash(dir /b /s c:reposPricingPagesrc 2)",
+      "Bash(dir /b \"c:\\repos\\PricingPage\")",
+      "Bash(dir /s /b \"c:\\repos\\PricingPage\")",
+      "Bash(findstr:*)",
+      "Bash(dir:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

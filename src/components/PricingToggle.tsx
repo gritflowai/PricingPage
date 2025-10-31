@@ -3,30 +3,46 @@ import React from 'react';
 interface PricingToggleProps {
   isAnnual: boolean;
   setIsAnnual: (value: boolean) => void;
+  monthlySavings?: number;
 }
 
-const PricingToggle: React.FC<PricingToggleProps> = ({ isAnnual, setIsAnnual }) => {
+const PricingToggle: React.FC<PricingToggleProps> = ({ isAnnual, setIsAnnual, monthlySavings }) => {
   return (
-    <div className="flex justify-center items-center mb-12">
-      <span className={`mr-3 text-base font-medium ${!isAnnual ? 'text-indigo-900' : 'text-gray-500'}`}>
-        Monthly
-      </span>
-      <button
-        className="relative inline-flex h-8 w-16 items-center rounded-full bg-gray-200"
-        onClick={() => setIsAnnual(!isAnnual)}
-        aria-pressed={isAnnual}
-        aria-labelledby="annual-billing-label"
-      >
-        <span className="sr-only">Enable annual billing</span>
-        <span
-          className={`${
-            isAnnual ? 'translate-x-9 bg-indigo-600' : 'translate-x-1 bg-white'
-          } inline-block h-6 w-6 transform rounded-full transition-transform duration-200 ease-in-out shadow-md`}
-        />
-      </button>
-      <span id="annual-billing-label" className={`ml-3 text-base font-medium ${isAnnual ? 'text-indigo-900' : 'text-gray-500'}`}>
-        Annual <span className="ml-1 text-sm text-green-600 font-medium">Save 20%</span>
-      </span>
+    <div className="flex flex-col items-center mb-8">
+      <div className="bg-white rounded-lg shadow-md p-1 inline-flex glow-blue">
+        <button
+          onClick={() => setIsAnnual(false)}
+          className={`px-6 py-3 rounded-md font-semibold text-base smooth-transition ${
+            !isAnnual
+              ? 'bg-[#1239FF] text-white shadow-sm'
+              : 'bg-transparent text-gray-600 hover:text-gray-800'
+          }`}
+        >
+          Monthly
+        </button>
+        <button
+          onClick={() => setIsAnnual(true)}
+          className={`px-6 py-3 rounded-md font-semibold text-base smooth-transition flex items-center gap-2 ${
+            isAnnual
+              ? 'bg-[#1239FF] text-white shadow-sm'
+              : 'bg-transparent text-gray-600 hover:text-gray-800'
+          }`}
+        >
+          Annual
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white text-[#1239FF] border-2 border-[#1239FF] shadow-sm">
+            2 MONTHS FREE
+          </span>
+        </button>
+      </div>
+
+      {/* You Save Callout */}
+      {isAnnual && monthlySavings && monthlySavings > 0 && (
+        <div className="mt-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-2 rounded-full shadow-lg animate-count">
+          <span className="text-sm font-bold">
+            You Save ${monthlySavings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/month with annual billing!
+          </span>
+        </div>
+      )}
     </div>
   );
 };
