@@ -23,8 +23,17 @@ interface PlanConfig {
   connections: number;
   usersPerCompany: number;
   scorecardsPerCompany: number | 'unlimited';
+  metricsPerScorecard: number;
   aiTokensPerCompany: number;
+  historicDataYears: number;
   contactThreshold: number;
+  stripeProductId: string;
+  features: {
+    dailySync: boolean;
+    immediateSyncCommand: boolean;
+    billingFlexibility: boolean;
+    customBranding: boolean;
+  };
 }
 
 // AI Advisor pricing tier
@@ -56,43 +65,79 @@ const SCALE_PRICING_TIERS: PricingTier[] = [
   { firstUnit: 35, lastUnit: 49, perUnit: 68, flatFee: 1000 }
 ];
 
-// Default plan configurations
+// Default plan configurations (synced with Stripe metadata)
 const DEFAULT_PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
   'ai-advisor': {
     name: 'AI Growth Advisor',
     pricingTiers: AI_PRICING_TIER,
     connections: 0,
-    usersPerCompany: 1,
-    scorecardsPerCompany: 'unlimited',
-    aiTokensPerCompany: 5000,
-    contactThreshold: 50
+    usersPerCompany: 2,
+    scorecardsPerCompany: 12,
+    metricsPerScorecard: 15,
+    aiTokensPerCompany: 2000,
+    historicDataYears: 2,
+    contactThreshold: 50,
+    stripeProductId: 'prod_7YtGm3ZhA2kR1Q5B',
+    features: {
+      dailySync: true,
+      immediateSyncCommand: false,
+      billingFlexibility: false,
+      customBranding: false
+    }
   },
   'starter': {
     name: 'Starter',
     pricingTiers: STARTER_PRICING_TIERS,
     connections: 1,
     usersPerCompany: 3,
-    scorecardsPerCompany: 5,
-    aiTokensPerCompany: 3000,
-    contactThreshold: 50
+    scorecardsPerCompany: 12,
+    metricsPerScorecard: 10,
+    aiTokensPerCompany: 2000,
+    historicDataYears: 2,
+    contactThreshold: 50,
+    stripeProductId: 'prod_9WlNx5UpL8dC4V6M',
+    features: {
+      dailySync: false,
+      immediateSyncCommand: false,
+      billingFlexibility: false,
+      customBranding: false
+    }
   },
   'growth': {
     name: 'Growth',
     pricingTiers: GROWTH_PRICING_TIERS,
     connections: 3,
-    usersPerCompany: 5,
-    scorecardsPerCompany: 10,
-    aiTokensPerCompany: 5000,
-    contactThreshold: 50
+    usersPerCompany: 5000,
+    scorecardsPerCompany: 25,
+    metricsPerScorecard: 15,
+    aiTokensPerCompany: 500,
+    historicDataYears: 3,
+    contactThreshold: 50,
+    stripeProductId: 'prod_3QpHz8EvN1sB7K2X',
+    features: {
+      dailySync: true,
+      immediateSyncCommand: true,
+      billingFlexibility: true,
+      customBranding: true
+    }
   },
   'scale': {
     name: 'Scale',
     pricingTiers: SCALE_PRICING_TIERS,
-    connections: 5,
-    usersPerCompany: 10,
-    scorecardsPerCompany: 'unlimited',
-    aiTokensPerCompany: 10000,
-    contactThreshold: 50
+    connections: 3,
+    usersPerCompany: 5000,
+    scorecardsPerCompany: 25,
+    metricsPerScorecard: 15,
+    aiTokensPerCompany: 5000,
+    historicDataYears: 23,
+    contactThreshold: 50,
+    stripeProductId: 'prod_6RtKx2JmF4aL9D7T',
+    features: {
+      dailySync: true,
+      immediateSyncCommand: true,
+      billingFlexibility: true,
+      customBranding: true
+    }
   }
 };
 
@@ -148,16 +193,59 @@ function getEmbedConfig() {
   };
 }
 
+// Load saved settings from localStorage
+function loadSavedSettings(): {
+  planConfigs: Record<PlanType, PlanConfig>;
+  wholesaleDiscount: number;
+  resellerCommission: number;
+} {
+  try {
+    const saved = localStorage.getItem('pricingSettings');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Merge with defaults to ensure new fields are present
+      const mergedConfigs = Object.keys(DEFAULT_PLAN_CONFIGS).reduce((acc, key) => {
+        const planKey = key as PlanType;
+        acc[planKey] = {
+          ...DEFAULT_PLAN_CONFIGS[planKey],
+          ...parsed.planConfigs[planKey],
+          features: {
+            ...DEFAULT_PLAN_CONFIGS[planKey].features,
+            ...(parsed.planConfigs[planKey]?.features || {})
+          }
+        };
+        return acc;
+      }, {} as Record<PlanType, PlanConfig>);
+
+      return {
+        planConfigs: mergedConfigs,
+        wholesaleDiscount: parsed.wholesaleDiscount || 0,
+        resellerCommission: parsed.resellerCommission || 0
+      };
+    }
+  } catch (error) {
+    console.error('Failed to load saved settings:', error);
+  }
+  return {
+    planConfigs: DEFAULT_PLAN_CONFIGS,
+    wholesaleDiscount: 0,
+    resellerCommission: 0
+  };
+}
+
 function App() {
   // Get embedding configuration from URL parameters
   const embedConfig = getEmbedConfig();
 
+  // Load saved settings
+  const savedSettings = loadSavedSettings();
+
   const [isAnnual, setIsAnnual] = useState(embedConfig.initialIsAnnual ?? true);
   const [count, setCount] = useState(embedConfig.initialCount ?? 10);
   const [selectedPlan, setSelectedPlan] = useState<PlanType>(embedConfig.initialPlan ?? 'starter');
-  const [planConfigs, setPlanConfigs] = useState<Record<PlanType, PlanConfig>>(DEFAULT_PLAN_CONFIGS);
-  const [wholesaleDiscount, setWholesaleDiscount] = useState(0);
-  const [resellerCommission, setResellerCommission] = useState(0);
+  const [planConfigs, setPlanConfigs] = useState<Record<PlanType, PlanConfig>>(savedSettings.planConfigs);
+  const [wholesaleDiscount, setWholesaleDiscount] = useState(savedSettings.wholesaleDiscount);
+  const [resellerCommission, setResellerCommission] = useState(savedSettings.resellerCommission);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showPricingDetails, setShowPricingDetails] = useState(false);
   const [isEnterpriseRequest, setIsEnterpriseRequest] = useState(false);
@@ -271,7 +359,13 @@ function App() {
     companies: "Number of client companies you can manage and track",
     connections: "Number of data integrations available (APIs, databases, etc.)",
     scorecards: "Number of performance scorecards you can create per company",
-    aiTokens: "Monthly AI credits for automated insights and analysis"
+    metricsPerScorecard: "Number of key performance indicators tracked per scorecard",
+    aiTokens: "Monthly AI credits for automated insights and analysis",
+    historicData: "Years of historical data retention and analysis",
+    dailySync: "Automatic daily synchronization of your data",
+    immediateSync: "On-demand instant data sync whenever you need it",
+    billingFlexibility: "Flexible payment terms and billing options",
+    customBranding: "White-label customization with your company branding"
   };
 
   // Calculate features based on selected plan
@@ -280,15 +374,47 @@ function App() {
         { value: count, label: 'User(s)', icon: 'fa-sharp fa-regular fa-user', tooltip: tooltips.users },
         { value: currentPlan.connections, label: 'Connections', icon: 'fa-sharp fa-regular fa-link', tooltip: tooltips.connections },
         { value: currentPlan.scorecardsPerCompany === 'unlimited' ? '∞' : currentPlan.scorecardsPerCompany, label: 'Scorecards', icon: 'fa-sharp fa-regular fa-chart-line', tooltip: tooltips.scorecards },
-        { value: (count * currentPlan.aiTokensPerCompany).toLocaleString(), label: 'AI Tokens', icon: 'fa-sharp fa-regular fa-sparkles', tooltip: tooltips.aiTokens }
+        { value: currentPlan.metricsPerScorecard, label: 'Metrics per Scorecard', icon: 'fa-sharp fa-regular fa-gauge-high', tooltip: tooltips.metricsPerScorecard },
+        { value: (count * currentPlan.aiTokensPerCompany).toLocaleString(), label: 'AI Tokens', icon: 'fa-sharp fa-regular fa-sparkles', tooltip: tooltips.aiTokens },
+        { value: `${currentPlan.historicDataYears} Yr${currentPlan.historicDataYears > 1 ? 's' : ''}`, label: 'Historic Data', icon: 'fa-sharp fa-regular fa-clock-rotate-left', tooltip: tooltips.historicData }
       ]
     : [
         { value: count, label: 'Companies', icon: 'fa-sharp fa-regular fa-building', tooltip: tooltips.companies },
         { value: currentPlan.connections, label: 'Connections', icon: 'fa-sharp fa-regular fa-link', tooltip: tooltips.connections },
         { value: count * currentPlan.usersPerCompany, label: 'Users', icon: 'fa-sharp fa-regular fa-users', tooltip: tooltips.users },
         { value: currentPlan.scorecardsPerCompany === 'unlimited' ? '∞' : (currentPlan.scorecardsPerCompany * count).toLocaleString(), label: 'Scorecards', icon: 'fa-sharp fa-regular fa-chart-line', tooltip: tooltips.scorecards },
-        { value: (count * currentPlan.aiTokensPerCompany).toLocaleString(), label: 'AI Tokens', icon: 'fa-sharp fa-regular fa-sparkles', tooltip: tooltips.aiTokens }
+        { value: currentPlan.metricsPerScorecard, label: 'Metrics per Scorecard', icon: 'fa-sharp fa-regular fa-gauge-high', tooltip: tooltips.metricsPerScorecard },
+        { value: (count * currentPlan.aiTokensPerCompany).toLocaleString(), label: 'AI Tokens', icon: 'fa-sharp fa-regular fa-sparkles', tooltip: tooltips.aiTokens },
+        { value: `${currentPlan.historicDataYears} Yr${currentPlan.historicDataYears > 1 ? 's' : ''}`, label: 'Historic Data', icon: 'fa-sharp fa-regular fa-clock-rotate-left', tooltip: tooltips.historicData }
       ];
+
+  // Feature flags with visual indicators
+  const featureFlags = [
+    {
+      enabled: currentPlan.features.dailySync,
+      label: 'Daily Sync',
+      icon: 'fa-sharp fa-regular fa-arrows-rotate',
+      tooltip: tooltips.dailySync
+    },
+    {
+      enabled: currentPlan.features.immediateSyncCommand,
+      label: 'Immediate Sync Command',
+      icon: 'fa-sharp fa-regular fa-bolt',
+      tooltip: tooltips.immediateSync
+    },
+    {
+      enabled: currentPlan.features.billingFlexibility,
+      label: 'Billing Flexibility',
+      icon: 'fa-sharp fa-regular fa-credit-card',
+      tooltip: tooltips.billingFlexibility
+    },
+    {
+      enabled: currentPlan.features.customBranding,
+      label: 'Custom Branding',
+      icon: 'fa-sharp fa-regular fa-palette',
+      tooltip: tooltips.customBranding
+    }
+  ];
 
   const handlePricingUpdate = (
     updatedConfigs: Record<PlanType, PlanConfig>,
@@ -298,6 +424,17 @@ function App() {
     setPlanConfigs(updatedConfigs);
     setWholesaleDiscount(newWholesaleDiscount);
     setResellerCommission(newResellerCommission);
+
+    // Save to localStorage
+    try {
+      localStorage.setItem('pricingSettings', JSON.stringify({
+        planConfigs: updatedConfigs,
+        wholesaleDiscount: newWholesaleDiscount,
+        resellerCommission: newResellerCommission
+      }));
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+    }
   };
 
   // Determine background color based on theme
@@ -411,23 +548,62 @@ function App() {
                     </div>
                   )}
 
-                  {/* Next Tier Preview */}
+                  {/* Next Tier Preview - Enhanced for Conversion */}
                   {nextTier && (
-                    <div className="text-center text-xs text-[#180D43]/70 bg-blue-50 border border-blue-100 rounded-lg py-2 px-3">
-                      {(() => {
-                        const companiesNeeded = nextTier.firstUnit - count;
-                        const nextTierSavings = calculateVolumeSavings(nextTier.firstUnit, currentTierIndex + 1, currentPlan.pricingTiers);
-                        return (
-                          <>
-                            <span className="font-medium text-[#1239FF]">
-                              Add {companiesNeeded} more {companiesNeeded === 1 ? (selectedPlan === 'ai-advisor' ? 'user' : 'company') : (selectedPlan === 'ai-advisor' ? 'users' : 'companies')} to unlock {nextTierSavings}% savings
-                            </span>
-                            {nextTier.perUnit > 0 && (
-                              <span className="ml-1">• ${nextTier.perUnit}/unit</span>
-                            )}
-                          </>
-                        );
-                      })()}
+                    <div className="relative overflow-hidden rounded-xl border-2 border-amber-400 bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 shadow-lg hover:shadow-xl smooth-transition transform hover:scale-[1.02] cursor-pointer">
+                      {/* Animated Glow Effect */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-amber-400/20 via-orange-400/20 to-yellow-400/20 animate-pulse"></div>
+
+                      {/* Content */}
+                      <div className="relative px-4 py-3 text-center">
+                        {(() => {
+                          const companiesNeeded = nextTier.firstUnit - count;
+                          const nextTierSavings = calculateVolumeSavings(nextTier.firstUnit, currentTierIndex + 1, currentPlan.pricingTiers);
+                          const potentialSavingsAmount = Math.round((finalPrice * nextTierSavings) / (100 - nextTierSavings));
+
+                          return (
+                            <>
+                              {/* Eye-catching Header */}
+                              <div className="flex items-center justify-center gap-2 mb-2">
+                                <svg className="w-5 h-5 text-amber-600 animate-bounce" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clipRule="evenodd" />
+                                </svg>
+                                <span className="text-xs font-extrabold text-amber-900 uppercase tracking-wide">
+                                  Unlock Bigger Savings
+                                </span>
+                              </div>
+
+                              {/* Main Message */}
+                              <div className="text-sm font-bold text-gray-900 mb-1">
+                                Add just <span className="text-xl text-amber-600">{companiesNeeded}</span> more {companiesNeeded === 1 ? (selectedPlan === 'ai-advisor' ? 'user' : 'company') : (selectedPlan === 'ai-advisor' ? 'users' : 'companies')}
+                              </div>
+
+                              {/* Savings Highlight */}
+                              <div className="inline-flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-full px-4 py-2 border border-amber-300 shadow-md">
+                                <span className="text-2xl font-extrabold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+                                  {nextTierSavings}% OFF
+                                </span>
+                                {nextTier.perUnit > 0 && potentialSavingsAmount > 0 && (
+                                  <span className="text-sm text-gray-700 font-semibold">
+                                    Save ~${potentialSavingsAmount}/mo
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Unit Price */}
+                              {nextTier.perUnit > 0 && (
+                                <div className="mt-2 text-xs text-gray-600 font-medium">
+                                  Next tier: ${nextTier.perUnit}/unit
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Decorative Corner Elements */}
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-amber-300/30 to-transparent rounded-bl-full"></div>
+                      <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-orange-300/30 to-transparent rounded-tr-full"></div>
                     </div>
                   )}
                 </div>
@@ -599,7 +775,9 @@ function App() {
 
               <div className="bg-[#F0F4FF] rounded-lg p-4">
                 <h3 className="text-sm font-semibold text-[#180D43] mb-3">Plan Includes</h3>
-                <div className="grid grid-cols-2 gap-3">
+
+                {/* Quantifiable Features */}
+                <div className="grid grid-cols-2 gap-3 mb-4">
                   {planFeatures.map((feature, index) => (
                     <div key={index} className="flex items-center gap-2">
                       <i className={`${feature.icon} text-[#1239FF] text-base`} aria-label={feature.label} role="img"></i>
@@ -607,6 +785,26 @@ function App() {
                         <div>
                           <span className="font-semibold text-[#1239FF]">{feature.value}</span>
                           <span className="text-sm text-[#180D43] ml-1">{feature.label}</span>
+                        </div>
+                        <Tooltip content={feature.tooltip} position="top" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-gray-300 my-3"></div>
+
+                {/* Feature Flags */}
+                <h4 className="text-xs font-semibold text-[#180D43] mb-2 uppercase tracking-wide">Additional Features</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {featureFlags.map((feature, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <i className={`${feature.icon} ${feature.enabled ? 'text-[#1239FF]' : 'text-gray-400'} text-base`} aria-label={feature.label} role="img"></i>
+                      <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
+                          <i className={`fa-sharp fa-solid ${feature.enabled ? 'fa-circle-check text-green-600' : 'fa-circle-xmark text-gray-400'} text-sm`}></i>
+                          <span className={`text-sm ${feature.enabled ? 'text-[#180D43]' : 'text-gray-500'}`}>{feature.label}</span>
                         </div>
                         <Tooltip content={feature.tooltip} position="top" />
                       </div>

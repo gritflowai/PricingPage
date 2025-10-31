@@ -14,8 +14,17 @@ interface PlanConfig {
   connections: number;
   usersPerCompany: number;
   scorecardsPerCompany: number | 'unlimited';
+  metricsPerScorecard: number;
   aiTokensPerCompany: number;
+  historicDataYears: number;
   contactThreshold: number;
+  stripeProductId: string;
+  features: {
+    dailySync: boolean;
+    immediateSyncCommand: boolean;
+    billingFlexibility: boolean;
+    customBranding: boolean;
+  };
 }
 
 type PlanType = 'ai-advisor' | 'starter' | 'growth' | 'scale';
@@ -73,6 +82,18 @@ const Settings: React.FC<SettingsProps> = ({
   const updatePlanFeature = (plan: PlanType, field: keyof PlanConfig, value: any) => {
     const newConfigs = { ...updatedConfigs };
     newConfigs[plan] = { ...newConfigs[plan], [field]: value };
+    setUpdatedConfigs(newConfigs);
+  };
+
+  const updatePlanFeatureFlag = (plan: PlanType, flag: keyof PlanConfig['features'], value: boolean) => {
+    const newConfigs = { ...updatedConfigs };
+    newConfigs[plan] = {
+      ...newConfigs[plan],
+      features: {
+        ...newConfigs[plan].features,
+        [flag]: value
+      }
+    };
     setUpdatedConfigs(newConfigs);
   };
 
@@ -159,11 +180,25 @@ const Settings: React.FC<SettingsProps> = ({
 
   const renderPlanSettings = (plan: PlanType) => {
     const config = updatedConfigs[plan];
+    const stripeUrl = `https://dashboard.stripe.com/acct_1EV6jWFreq0FdVf6/products/${config.stripeProductId}`;
 
     return (
       <div className="space-y-6">
         <div>
-          <h3 className="text-lg font-semibold mb-4">{config.name} Plan Configuration</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">{config.name} Plan Configuration</h3>
+            <a
+              href={stripeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#635BFF] text-white rounded-lg hover:bg-[#0A2540] transition-colors text-sm font-medium"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              View in Stripe
+            </a>
+          </div>
 
           <div className="bg-gray-50 p-4 rounded-lg mb-6">
             <h4 className="text-sm font-medium text-gray-700 mb-3">Enterprise Contact Threshold</h4>
@@ -233,6 +268,18 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Metrics per Scorecard
+                </label>
+                <input
+                  type="number"
+                  value={config.metricsPerScorecard}
+                  onChange={(e) => updatePlanFeature(plan, 'metricsPerScorecard', Number(e.target.value))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  min="1"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   AI Tokens per Company
                 </label>
                 <input
@@ -244,6 +291,64 @@ const Settings: React.FC<SettingsProps> = ({
                   step="1000"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Historic Data Years
+                </label>
+                <input
+                  type="number"
+                  value={config.historicDataYears}
+                  onChange={(e) => updatePlanFeature(plan, 'historicDataYears', Number(e.target.value))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  min="1"
+                  max="10"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 p-4 rounded-lg mb-6">
+            <h4 className="text-sm font-medium text-gray-700 mb-3">Feature Flags</h4>
+            <p className="text-sm text-gray-600 mb-4">
+              Enable or disable specific features for this plan. These features vary between tiers.
+            </p>
+            <div className="space-y-3">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={config.features.dailySync}
+                  onChange={(e) => updatePlanFeatureFlag(plan, 'dailySync', e.target.checked)}
+                  className="rounded border-gray-300 text-[#1239FF] focus:ring-[#1239FF] h-4 w-4"
+                />
+                <span className="ml-2 text-sm text-gray-700">Daily Sync</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={config.features.immediateSyncCommand}
+                  onChange={(e) => updatePlanFeatureFlag(plan, 'immediateSyncCommand', e.target.checked)}
+                  className="rounded border-gray-300 text-[#1239FF] focus:ring-[#1239FF] h-4 w-4"
+                />
+                <span className="ml-2 text-sm text-gray-700">Immediate Sync Command</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={config.features.billingFlexibility}
+                  onChange={(e) => updatePlanFeatureFlag(plan, 'billingFlexibility', e.target.checked)}
+                  className="rounded border-gray-300 text-[#1239FF] focus:ring-[#1239FF] h-4 w-4"
+                />
+                <span className="ml-2 text-sm text-gray-700">Billing Flexibility</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={config.features.customBranding}
+                  onChange={(e) => updatePlanFeatureFlag(plan, 'customBranding', e.target.checked)}
+                  className="rounded border-gray-300 text-[#1239FF] focus:ring-[#1239FF] h-4 w-4"
+                />
+                <span className="ml-2 text-sm text-gray-700">Custom Branding</span>
+              </label>
             </div>
           </div>
 
