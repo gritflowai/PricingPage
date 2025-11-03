@@ -24,7 +24,7 @@ interface PlanConfig {
   usersPerCompany: number;
   scorecardsPerCompany: number | 'unlimited';
   metricsPerScorecard: number;
-  aiTokensPerCompany: number;
+  aiTokensPerDollar: number;
   historicDataYears: number;
   contactThreshold: number;
   stripeProductId: string;
@@ -36,33 +36,40 @@ interface PlanConfig {
   };
 }
 
-// AI Advisor pricing tier
+// AI Advisor pricing tiers (volume discounts for users)
 const AI_PRICING_TIER: PricingTier[] = [
-  { firstUnit: 1, lastUnit: Infinity, perUnit: 19, flatFee: 0 }
+  { firstUnit: 1, lastUnit: 5, perUnit: 19, flatFee: 0 },
+  { firstUnit: 6, lastUnit: 14, perUnit: 17, flatFee: 0 },
+  { firstUnit: 15, lastUnit: 29, perUnit: 15, flatFee: 0 },
+  { firstUnit: 30, lastUnit: 49, perUnit: 12, flatFee: 0 },
+  { firstUnit: 50, lastUnit: 999, perUnit: 10, flatFee: 0 }
 ];
 
 // Starter plan pricing tiers
 const STARTER_PRICING_TIERS: PricingTier[] = [
-  { firstUnit: 1, lastUnit: 9, perUnit: 90, flatFee: 0 },
-  { firstUnit: 10, lastUnit: 24, perUnit: 50, flatFee: 200 },
-  { firstUnit: 25, lastUnit: 34, perUnit: 34, flatFee: 300 },
-  { firstUnit: 35, lastUnit: 49, perUnit: 24, flatFee: 400 }
+  { firstUnit: 1, lastUnit: 5, perUnit: 90, flatFee: 0 },
+  { firstUnit: 6, lastUnit: 15, perUnit: 50, flatFee: 200 },
+  { firstUnit: 16, lastUnit: 30, perUnit: 35, flatFee: 425 },
+  { firstUnit: 31, lastUnit: 50, perUnit: 25, flatFee: 725 },
+  { firstUnit: 51, lastUnit: 999, perUnit: 20, flatFee: 975 }
 ];
 
 // Growth plan pricing tiers
 const GROWTH_PRICING_TIERS: PricingTier[] = [
-  { firstUnit: 1, lastUnit: 9, perUnit: 120, flatFee: 0 },
-  { firstUnit: 10, lastUnit: 24, perUnit: 80, flatFee: 400 },
-  { firstUnit: 25, lastUnit: 34, perUnit: 64, flatFee: 600 },
-  { firstUnit: 35, lastUnit: 49, perUnit: 38, flatFee: 800 }
+  { firstUnit: 1, lastUnit: 5, perUnit: 180, flatFee: 0 },
+  { firstUnit: 6, lastUnit: 15, perUnit: 100, flatFee: 400 },
+  { firstUnit: 16, lastUnit: 30, perUnit: 65, flatFee: 925 },
+  { firstUnit: 31, lastUnit: 50, perUnit: 55, flatFee: 1225 },
+  { firstUnit: 51, lastUnit: 999, perUnit: 50, flatFee: 1475 }
 ];
 
 // Scale plan pricing tiers
 const SCALE_PRICING_TIERS: PricingTier[] = [
-  { firstUnit: 1, lastUnit: 9, perUnit: 150, flatFee: 0 },
-  { firstUnit: 10, lastUnit: 24, perUnit: 110, flatFee: 600 },
-  { firstUnit: 25, lastUnit: 34, perUnit: 94, flatFee: 800 },
-  { firstUnit: 35, lastUnit: 49, perUnit: 68, flatFee: 1000 }
+  { firstUnit: 1, lastUnit: 5, perUnit: 350, flatFee: 0 },
+  { firstUnit: 6, lastUnit: 15, perUnit: 200, flatFee: 750 },
+  { firstUnit: 16, lastUnit: 30, perUnit: 125, flatFee: 1875 },
+  { firstUnit: 31, lastUnit: 50, perUnit: 100, flatFee: 2625 },
+  { firstUnit: 51, lastUnit: 999, perUnit: 85, flatFee: 3375 }
 ];
 
 // Default plan configurations (synced with Stripe metadata)
@@ -71,15 +78,15 @@ const DEFAULT_PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
     name: 'AI Growth Advisor',
     pricingTiers: AI_PRICING_TIER,
     connections: 0,
-    usersPerCompany: 2,
-    scorecardsPerCompany: 12,
-    metricsPerScorecard: 15,
-    aiTokensPerCompany: 2000,
-    historicDataYears: 2,
+    usersPerCompany: 1,
+    scorecardsPerCompany: 'unlimited',
+    metricsPerScorecard: 999,
+    aiTokensPerDollar: 166666,
+    historicDataYears: 0,
     contactThreshold: 50,
     stripeProductId: 'prod_7YtGm3ZhA2kR1Q5B',
     features: {
-      dailySync: true,
+      dailySync: false,
       immediateSyncCommand: false,
       billingFlexibility: false,
       customBranding: false
@@ -92,12 +99,12 @@ const DEFAULT_PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
     usersPerCompany: 3,
     scorecardsPerCompany: 12,
     metricsPerScorecard: 10,
-    aiTokensPerCompany: 2000,
+    aiTokensPerDollar: 166666,
     historicDataYears: 2,
     contactThreshold: 50,
     stripeProductId: 'prod_9WlNx5UpL8dC4V6M',
     features: {
-      dailySync: false,
+      dailySync: true,
       immediateSyncCommand: false,
       billingFlexibility: false,
       customBranding: false
@@ -107,10 +114,10 @@ const DEFAULT_PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
     name: 'Growth',
     pricingTiers: GROWTH_PRICING_TIERS,
     connections: 3,
-    usersPerCompany: 5000,
+    usersPerCompany: 5,
     scorecardsPerCompany: 25,
     metricsPerScorecard: 15,
-    aiTokensPerCompany: 500,
+    aiTokensPerDollar: 166666,
     historicDataYears: 3,
     contactThreshold: 50,
     stripeProductId: 'prod_3QpHz8EvN1sB7K2X',
@@ -124,12 +131,12 @@ const DEFAULT_PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
   'scale': {
     name: 'Scale',
     pricingTiers: SCALE_PRICING_TIERS,
-    connections: 3,
-    usersPerCompany: 5000,
+    connections: 5,
+    usersPerCompany: 8,
     scorecardsPerCompany: 25,
     metricsPerScorecard: 15,
-    aiTokensPerCompany: 5000,
-    historicDataYears: 23,
+    aiTokensPerDollar: 166666,
+    historicDataYears: 4,
     contactThreshold: 50,
     stripeProductId: 'prod_6RtKx2JmF4aL9D7T',
     features: {
@@ -177,6 +184,18 @@ function calculateVolumeSavings(count: number, currentTierIndex: number, pricing
   const savingsPercent = ((firstTierPrice - currentPrice) / firstTierPrice) * 100;
 
   return Math.max(0, Math.round(savingsPercent));
+}
+
+// Format large numbers with abbreviations (k for thousands, M for millions, B for billions)
+function formatLargeNumber(num: number): string {
+  if (num >= 1_000_000_000) {
+    return (num / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'B';
+  } else if (num >= 1_000_000) {
+    return (num / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+  } else if (num >= 1_000) {
+    return (num / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
+  }
+  return num.toLocaleString();
 }
 
 // Parse URL parameters for embedding configuration
@@ -281,6 +300,9 @@ function App() {
 
   const pricePerUnit = finalPrice / count;
 
+  // Calculate AI tokens dynamically based on final price
+  const calculatedAiTokens = Math.round(finalPrice * currentPlan.aiTokensPerDollar);
+
   // Calculate monthly savings for annual billing
   const monthlySavings = isAnnual ? priceBeforeAnnual * (2/12) : 0;
 
@@ -326,7 +348,7 @@ function App() {
           scorecards: currentPlan.scorecardsPerCompany === 'unlimited'
             ? 'unlimited'
             : (selectedPlan === 'ai-advisor' ? currentPlan.scorecardsPerCompany : currentPlan.scorecardsPerCompany * count),
-          aiTokens: count * currentPlan.aiTokensPerCompany,
+          aiTokens: calculatedAiTokens,
         },
       });
     }
@@ -343,6 +365,7 @@ function App() {
     wholesaleDiscount,
     resellerCommission,
     currentPlan,
+    calculatedAiTokens,
     sendSelectionUpdate,
   ]);
 
@@ -360,7 +383,7 @@ function App() {
     connections: "Number of data integrations available (APIs, databases, etc.)",
     scorecards: "Number of performance scorecards you can create per company",
     metricsPerScorecard: "Number of key performance indicators tracked per scorecard",
-    aiTokens: "Monthly AI credits for automated insights and analysis",
+    aiTokens: "Monthly AI credits for automated insights and analysis. Calculated as final monthly cost × 166,666 tokens per dollar. Includes all discounts.",
     historicData: "Years of historical data retention and analysis",
     dailySync: "Automatic daily synchronization of your data",
     immediateSync: "On-demand instant data sync whenever you need it",
@@ -372,11 +395,9 @@ function App() {
   const planFeatures = selectedPlan === 'ai-advisor'
     ? [
         { value: count, label: 'User(s)', icon: 'fa-sharp fa-regular fa-user', tooltip: tooltips.users },
-        { value: currentPlan.connections, label: 'Connections', icon: 'fa-sharp fa-regular fa-link', tooltip: tooltips.connections },
-        { value: currentPlan.scorecardsPerCompany === 'unlimited' ? '∞' : currentPlan.scorecardsPerCompany, label: 'Scorecards', icon: 'fa-sharp fa-regular fa-chart-line', tooltip: tooltips.scorecards },
-        { value: currentPlan.metricsPerScorecard, label: 'Metrics per Scorecard', icon: 'fa-sharp fa-regular fa-gauge-high', tooltip: tooltips.metricsPerScorecard },
-        { value: (count * currentPlan.aiTokensPerCompany).toLocaleString(), label: 'AI Tokens', icon: 'fa-sharp fa-regular fa-sparkles', tooltip: tooltips.aiTokens },
-        { value: `${currentPlan.historicDataYears} Yr${currentPlan.historicDataYears > 1 ? 's' : ''}`, label: 'Historic Data', icon: 'fa-sharp fa-regular fa-clock-rotate-left', tooltip: tooltips.historicData }
+        { value: currentPlan.scorecardsPerCompany === 'unlimited' ? '∞' : currentPlan.scorecardsPerCompany, label: 'Manual Scorecards', icon: 'fa-sharp fa-regular fa-chart-line', tooltip: 'Create unlimited manual scorecards for tracking your metrics' },
+        { value: '∞', label: 'Metrics per Scorecard', icon: 'fa-sharp fa-regular fa-gauge-high', tooltip: 'Add unlimited metrics to each scorecard' },
+        { value: formatLargeNumber(calculatedAiTokens), label: 'AI Tokens', icon: 'fa-sharp fa-regular fa-sparkles', tooltip: tooltips.aiTokens }
       ]
     : [
         { value: count, label: 'Companies', icon: 'fa-sharp fa-regular fa-building', tooltip: tooltips.companies },
@@ -384,7 +405,7 @@ function App() {
         { value: count * currentPlan.usersPerCompany, label: 'Users', icon: 'fa-sharp fa-regular fa-users', tooltip: tooltips.users },
         { value: currentPlan.scorecardsPerCompany === 'unlimited' ? '∞' : (currentPlan.scorecardsPerCompany * count).toLocaleString(), label: 'Scorecards', icon: 'fa-sharp fa-regular fa-chart-line', tooltip: tooltips.scorecards },
         { value: currentPlan.metricsPerScorecard, label: 'Metrics per Scorecard', icon: 'fa-sharp fa-regular fa-gauge-high', tooltip: tooltips.metricsPerScorecard },
-        { value: (count * currentPlan.aiTokensPerCompany).toLocaleString(), label: 'AI Tokens', icon: 'fa-sharp fa-regular fa-sparkles', tooltip: tooltips.aiTokens },
+        { value: formatLargeNumber(calculatedAiTokens), label: 'AI Tokens', icon: 'fa-sharp fa-regular fa-sparkles', tooltip: tooltips.aiTokens },
         { value: `${currentPlan.historicDataYears} Yr${currentPlan.historicDataYears > 1 ? 's' : ''}`, label: 'Historic Data', icon: 'fa-sharp fa-regular fa-clock-rotate-left', tooltip: tooltips.historicData }
       ];
 
@@ -657,7 +678,7 @@ function App() {
                         scorecards: currentPlan.scorecardsPerCompany === 'unlimited'
                           ? 'unlimited'
                           : (selectedPlan === 'ai-advisor' ? currentPlan.scorecardsPerCompany : currentPlan.scorecardsPerCompany * count),
-                        aiTokens: count * currentPlan.aiTokensPerCompany,
+                        aiTokens: calculatedAiTokens,
                       },
                     });
                   }}
@@ -777,7 +798,7 @@ function App() {
                 <h3 className="text-sm font-semibold text-[#180D43] mb-3">Plan Includes</h3>
 
                 {/* Quantifiable Features */}
-                <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="grid grid-cols-2 gap-3">
                   {planFeatures.map((feature, index) => (
                     <div key={index} className="flex items-center gap-2">
                       <i className={`${feature.icon} text-[#1239FF] text-base`} aria-label={feature.label} role="img"></i>
@@ -792,25 +813,33 @@ function App() {
                   ))}
                 </div>
 
-                {/* Divider */}
-                <div className="border-t border-gray-300 my-3"></div>
+                {/* Feature Flags - Only show for non-AI Advisor plans */}
+                {selectedPlan !== 'ai-advisor' && (
+                  <>
+                    {/* Divider */}
+                    <div className="border-t border-gray-300 my-3"></div>
 
-                {/* Feature Flags */}
-                <h4 className="text-xs font-semibold text-[#180D43] mb-2 uppercase tracking-wide">Additional Features</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  {featureFlags.map((feature, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <i className={`${feature.icon} ${feature.enabled ? 'text-[#1239FF]' : 'text-gray-400'} text-base`} aria-label={feature.label} role="img"></i>
-                      <div className="flex items-center gap-1">
-                        <div className="flex items-center gap-1.5">
-                          <i className={`fa-sharp fa-solid ${feature.enabled ? 'fa-circle-check text-green-600' : 'fa-circle-xmark text-gray-400'} text-sm`}></i>
-                          <span className={`text-sm ${feature.enabled ? 'text-[#180D43]' : 'text-gray-500'}`}>{feature.label}</span>
+                    {/* Feature Flags */}
+                    <h4 className="text-xs font-semibold text-[#180D43] mb-2 uppercase tracking-wide">Additional Features</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      {featureFlags.map((feature, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <i className={`${feature.icon} ${feature.enabled ? 'text-[#1239FF]' : 'text-gray-400'} text-base`} aria-label={feature.label} role="img"></i>
+                          <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <i className={`fa-sharp fa-solid ${feature.enabled ? 'fa-circle-check text-green-600' : 'fa-circle-xmark text-gray-400'} text-sm`}></i>
+                              <span className={`text-sm ${feature.enabled ? 'text-[#180D43]' : 'text-gray-400'}`}>
+                                {feature.label}
+                                {!feature.enabled && <span className="text-xs ml-1">(Not Included)</span>}
+                              </span>
+                              <Tooltip content={feature.tooltip} position="top" />
+                            </div>
+                          </div>
                         </div>
-                        <Tooltip content={feature.tooltip} position="top" />
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -857,7 +886,7 @@ function App() {
               scorecards: currentPlan.scorecardsPerCompany === 'unlimited'
                 ? 'unlimited'
                 : (selectedPlan === 'ai-advisor' ? currentPlan.scorecardsPerCompany : currentPlan.scorecardsPerCompany * count),
-              aiTokens: count * currentPlan.aiTokensPerCompany,
+              aiTokens: calculatedAiTokens,
             },
           });
         }}

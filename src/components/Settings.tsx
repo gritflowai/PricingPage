@@ -15,7 +15,7 @@ interface PlanConfig {
   usersPerCompany: number;
   scorecardsPerCompany: number | 'unlimited';
   metricsPerScorecard: number;
-  aiTokensPerCompany: number;
+  aiTokensPerDollar: number;
   historicDataYears: number;
   contactThreshold: number;
   stripeProductId: string;
@@ -247,7 +247,7 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Scorecards per Company
+                  {plan === 'ai-advisor' ? 'Manual Scorecards' : 'Scorecards per Company'}
                 </label>
                 {plan === 'ai-advisor' || plan === 'scale' ? (
                   <input
@@ -270,26 +270,38 @@ const Settings: React.FC<SettingsProps> = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Metrics per Scorecard
                 </label>
-                <input
-                  type="number"
-                  value={config.metricsPerScorecard}
-                  onChange={(e) => updatePlanFeature(plan, 'metricsPerScorecard', Number(e.target.value))}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2"
-                  min="1"
-                />
+                {plan === 'ai-advisor' ? (
+                  <input
+                    type="text"
+                    value="Unlimited"
+                    disabled
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 bg-gray-100"
+                  />
+                ) : (
+                  <input
+                    type="number"
+                    value={config.metricsPerScorecard}
+                    onChange={(e) => updatePlanFeature(plan, 'metricsPerScorecard', Number(e.target.value))}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2"
+                    min="1"
+                  />
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  AI Tokens per Company
+                  AI Tokens per Dollar
                 </label>
                 <input
                   type="number"
-                  value={config.aiTokensPerCompany}
-                  onChange={(e) => updatePlanFeature(plan, 'aiTokensPerCompany', Number(e.target.value))}
+                  value={config.aiTokensPerDollar}
+                  onChange={(e) => updatePlanFeature(plan, 'aiTokensPerDollar', Number(e.target.value))}
                   className="w-full rounded-md border border-gray-300 px-3 py-2"
                   min="1000"
                   step="1000"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  AI tokens are calculated dynamically: Final Monthly Cost × Tokens per Dollar
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -307,50 +319,52 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
           </div>
 
-          <div className="bg-gray-50 p-4 rounded-lg mb-6">
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Feature Flags</h4>
-            <p className="text-sm text-gray-600 mb-4">
-              Enable or disable specific features for this plan. These features vary between tiers.
-            </p>
-            <div className="space-y-3">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={config.features.dailySync}
-                  onChange={(e) => updatePlanFeatureFlag(plan, 'dailySync', e.target.checked)}
-                  className="rounded border-gray-300 text-[#1239FF] focus:ring-[#1239FF] h-4 w-4"
-                />
-                <span className="ml-2 text-sm text-gray-700">Daily Sync</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={config.features.immediateSyncCommand}
-                  onChange={(e) => updatePlanFeatureFlag(plan, 'immediateSyncCommand', e.target.checked)}
-                  className="rounded border-gray-300 text-[#1239FF] focus:ring-[#1239FF] h-4 w-4"
-                />
-                <span className="ml-2 text-sm text-gray-700">Immediate Sync Command</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={config.features.billingFlexibility}
-                  onChange={(e) => updatePlanFeatureFlag(plan, 'billingFlexibility', e.target.checked)}
-                  className="rounded border-gray-300 text-[#1239FF] focus:ring-[#1239FF] h-4 w-4"
-                />
-                <span className="ml-2 text-sm text-gray-700">Billing Flexibility</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={config.features.customBranding}
-                  onChange={(e) => updatePlanFeatureFlag(plan, 'customBranding', e.target.checked)}
-                  className="rounded border-gray-300 text-[#1239FF] focus:ring-[#1239FF] h-4 w-4"
-                />
-                <span className="ml-2 text-sm text-gray-700">Custom Branding</span>
-              </label>
+          {plan !== 'ai-advisor' && (
+            <div className="bg-gray-50 p-4 rounded-lg mb-6">
+              <h4 className="text-sm font-medium text-gray-700 mb-3">Feature Flags</h4>
+              <p className="text-sm text-gray-600 mb-4">
+                Enable or disable specific features for this plan. These features vary between tiers.
+              </p>
+              <div className="space-y-3">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={config.features.dailySync}
+                    onChange={(e) => updatePlanFeatureFlag(plan, 'dailySync', e.target.checked)}
+                    className="rounded border-gray-300 text-[#1239FF] focus:ring-[#1239FF] h-4 w-4"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Daily Sync</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={config.features.immediateSyncCommand}
+                    onChange={(e) => updatePlanFeatureFlag(plan, 'immediateSyncCommand', e.target.checked)}
+                    className="rounded border-gray-300 text-[#1239FF] focus:ring-[#1239FF] h-4 w-4"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Immediate Sync Command</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={config.features.billingFlexibility}
+                    onChange={(e) => updatePlanFeatureFlag(plan, 'billingFlexibility', e.target.checked)}
+                    className="rounded border-gray-300 text-[#1239FF] focus:ring-[#1239FF] h-4 w-4"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Billing Flexibility</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={config.features.customBranding}
+                    onChange={(e) => updatePlanFeatureFlag(plan, 'customBranding', e.target.checked)}
+                    className="rounded border-gray-300 text-[#1239FF] focus:ring-[#1239FF] h-4 w-4"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Custom Branding</span>
+                </label>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="mb-4">
             <h4 className="text-sm font-semibold">Volume Pricing Tiers</h4>
