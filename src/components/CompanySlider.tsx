@@ -104,7 +104,14 @@ const CompanySlider: React.FC<CompanySliderProps> = ({
     }
   };
 
-  const unitLabel = isAIMode ? "user" : "company";
+  // Extract unit label from the label prop (e.g., "Select Number of Locations" → "location")
+  const unitLabel = isAIMode
+    ? "user"
+    : label.toLowerCase().includes('location')
+      ? 'location'
+      : label.toLowerCase().includes('client')
+        ? 'client'
+        : 'company';
 
   // Calculate slider percentage for gradient
   const sliderPercent = ((companies - minCompanies) / (maxCompanies - minCompanies)) * 100;

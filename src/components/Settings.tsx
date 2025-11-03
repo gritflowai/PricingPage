@@ -40,6 +40,11 @@ interface SettingsProps {
     resellerCommission: number
   ) => void;
   isEmbedded?: boolean;
+  terminology?: {
+    singular: string;
+    plural: string;
+    capitalized: string;
+  };
 }
 
 const Settings: React.FC<SettingsProps> = ({
@@ -47,7 +52,8 @@ const Settings: React.FC<SettingsProps> = ({
   wholesaleDiscount: initialWholesaleDiscount,
   resellerCommission: initialResellerCommission,
   onUpdatePricing,
-  isEmbedded = false
+  isEmbedded = false,
+  terminology = { singular: 'company', plural: 'companies', capitalized: 'Companies' }
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('ai-advisor');
@@ -207,7 +213,7 @@ const Settings: React.FC<SettingsProps> = ({
             </p>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {plan === 'ai-advisor' ? 'AI Growth Advisor (users)' : `${config.name} Plan (companies)`}
+                {plan === 'ai-advisor' ? 'AI Growth Advisor (users)' : `${config.name} Plan (${terminology.plural})`}
               </label>
               <input
                 type="number"
@@ -369,7 +375,7 @@ const Settings: React.FC<SettingsProps> = ({
           <div className="mb-4">
             <h4 className="text-sm font-semibold">Volume Pricing Tiers</h4>
             <p className="text-sm text-gray-600">
-              Define pricing tiers based on the number of {plan === 'ai-advisor' ? 'users' : 'companies'}
+              Define pricing tiers based on the number of {plan === 'ai-advisor' ? 'users' : terminology.plural}
             </p>
           </div>
 

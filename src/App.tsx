@@ -4,11 +4,15 @@ import CompanySlider from './components/CompanySlider';
 import Settings from './components/Settings';
 import ContactModal from './components/ContactModal';
 import Tooltip from './components/Tooltip';
+import RoleSelector from './components/RoleSelector';
 import { AlertCircle, ChevronDown, Shield, CreditCard, RefreshCw } from 'lucide-react';
 import { useIframeMessaging } from './hooks/useIframeMessaging';
 
 // Define plan types
 type PlanType = 'ai-advisor' | 'starter' | 'growth' | 'scale';
+
+// Define user types for role selection
+type UserType = 'cpa' | 'franchisee' | 'smb';
 
 interface PricingTier {
   firstUnit: number;
@@ -252,6 +256,22 @@ function loadSavedSettings(): {
   };
 }
 
+// Terminology helper function for role-based language
+function getTerminology(userType: UserType): {
+  singular: string;
+  plural: string;
+  capitalized: string;
+} {
+  switch (userType) {
+    case 'cpa':
+      return { singular: 'client', plural: 'clients', capitalized: 'Clients' };
+    case 'franchisee':
+      return { singular: 'location', plural: 'locations', capitalized: 'Locations' };
+    case 'smb':
+      return { singular: 'company', plural: 'companies', capitalized: 'Companies' };
+  }
+}
+
 function App() {
   // Get embedding configuration from URL parameters
   const embedConfig = getEmbedConfig();
@@ -259,6 +279,7 @@ function App() {
   // Load saved settings
   const savedSettings = loadSavedSettings();
 
+  const [userType, setUserType] = useState<UserType>('franchisee'); // Default to franchisee (target market)
   const [isAnnual, setIsAnnual] = useState(embedConfig.initialIsAnnual ?? true);
   const [count, setCount] = useState(embedConfig.initialCount ?? 10);
   const [selectedPlan, setSelectedPlan] = useState<PlanType>(embedConfig.initialPlan ?? 'starter');
@@ -267,9 +288,13 @@ function App() {
   const [resellerCommission, setResellerCommission] = useState(savedSettings.resellerCommission);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showPricingDetails, setShowPricingDetails] = useState(false);
+  const [showPlanDetails, setShowPlanDetails] = useState(false);
   const [isEnterpriseRequest, setIsEnterpriseRequest] = useState(false);
 
   const currentPlan = planConfigs[selectedPlan];
+
+  // Get terminology based on user type
+  const terminology = getTerminology(userType);
 
   // Initialize iframe messaging
   const {
@@ -400,7 +425,7 @@ function App() {
         { value: formatLargeNumber(calculatedAiTokens), label: 'AI Tokens', icon: 'fa-sharp fa-regular fa-sparkles', tooltip: tooltips.aiTokens }
       ]
     : [
-        { value: count, label: 'Companies', icon: 'fa-sharp fa-regular fa-building', tooltip: tooltips.companies },
+        { value: count, label: terminology.capitalized, icon: 'fa-sharp fa-regular fa-building', tooltip: tooltips.companies },
         { value: currentPlan.connections, label: 'Connections', icon: 'fa-sharp fa-regular fa-link', tooltip: tooltips.connections },
         { value: count * currentPlan.usersPerCompany, label: 'Users', icon: 'fa-sharp fa-regular fa-users', tooltip: tooltips.users },
         { value: currentPlan.scorecardsPerCompany === 'unlimited' ? '∞' : (currentPlan.scorecardsPerCompany * count).toLocaleString(), label: 'Scorecards', icon: 'fa-sharp fa-regular fa-chart-line', tooltip: tooltips.scorecards },
@@ -467,8 +492,12 @@ function App() {
   const minHeight = embedConfig.isEmbedded ? 'min-h-fit' : 'min-h-screen';
 
   return (
-    <div className={`${minHeight} ${backgroundColor} p-2`}>
-      <div className="max-w-6xl mx-auto mb-8 pt-3">
+    <div className={`${minHeight} ${backgroundColor}`}>
+      {/* Role Selector at the very top */}
+      <RoleSelector selected={userType} onChange={setUserType} />
+
+      <div className="p-2">
+        <div className="max-w-6xl mx-auto mb-8 pt-3">
         <div className="bg-white rounded-lg shadow-sm border border-[#1239FF]/10 p-1 overflow-visible relative">
           <div className="flex flex-col md:flex-row gap-2">
             <button
@@ -548,7 +577,7 @@ function App() {
                 companies={count}
                 setCompanies={setCount}
                 pricingTiers={currentPlan.pricingTiers}
-                label={selectedPlan === 'ai-advisor' ? "Select Number of Users" : "Select Number of Companies"}
+                label={selectedPlan === 'ai-advisor' ? "Select Number of Users" : `Select Number of ${terminology.capitalized}`}
                 maxCompanies={currentPlan.contactThreshold}
                 contactThreshold={currentPlan.contactThreshold}
                 onExceedThreshold={() => {
@@ -596,7 +625,7 @@ function App() {
 
                               {/* Main Message */}
                               <div className="text-sm font-bold text-gray-900 mb-1">
-                                Add just <span className="text-xl text-amber-600">{companiesNeeded}</span> more {companiesNeeded === 1 ? (selectedPlan === 'ai-advisor' ? 'user' : 'company') : (selectedPlan === 'ai-advisor' ? 'users' : 'companies')}
+                                Add just <span className="text-xl text-amber-600">{companiesNeeded}</span> more {companiesNeeded === 1 ? (selectedPlan === 'ai-advisor' ? 'user' : terminology.singular) : (selectedPlan === 'ai-advisor' ? 'users' : terminology.plural)}
                               </div>
 
                               {/* Savings Highlight */}
@@ -646,7 +675,7 @@ function App() {
                   <span className="text-lg md:text-xl font-normal text-[#180D43]/70">/mo</span>
                 </div>
                 <div className="text-base md:text-lg text-[#180D43]/80 mb-1">
-                  {count} {selectedPlan === 'ai-advisor' ? 'users' : 'companies'} • <span className="font-semibold text-[#1239FF]">${formatNumber(pricePerUnit)}</span> each
+                  {count} {selectedPlan === 'ai-advisor' ? 'users' : terminology.plural} • <span className="font-semibold text-[#1239FF]">${formatNumber(pricePerUnit)}</span> each
                 </div>
                 {isAnnual && (
                   <div className="text-xs md:text-sm text-green-600 font-medium">
@@ -718,7 +747,7 @@ function App() {
                   <div className="bg-gray-50 rounded-lg p-2 md:p-3 mt-3 text-xs md:text-sm">
                     <div className="space-y-2">
                       <div className="border-b border-gray-200 pb-2">
-                        <div className="font-medium text-sm md:text-base">{selectedPlan === 'ai-advisor' ? 'Users' : 'Companies'} ({count}):</div>
+                        <div className="font-medium text-sm md:text-base">{selectedPlan === 'ai-advisor' ? 'Users' : terminology.capitalized} ({count}):</div>
                         {basePrice.perUnit > 0 && (
                           <div className="flex justify-between text-[#180D43]/70 text-xs md:text-sm">
                             <span className="truncate mr-2">{count} × ${formatNumber(basePrice.perUnit / count)}/unit</span>
@@ -797,9 +826,9 @@ function App() {
               <div className="bg-[#F0F4FF] rounded-lg p-4">
                 <h3 className="text-sm font-semibold text-[#180D43] mb-3">Plan Includes</h3>
 
-                {/* Quantifiable Features */}
+                {/* Primary Features - Always visible (first 4 for standard plans, all for AI advisor) */}
                 <div className="grid grid-cols-2 gap-3">
-                  {planFeatures.map((feature, index) => (
+                  {planFeatures.slice(0, selectedPlan === 'ai-advisor' ? planFeatures.length : 4).map((feature, index) => (
                     <div key={index} className="flex items-center gap-2">
                       <i className={`${feature.icon} text-[#1239FF] text-base`} aria-label={feature.label} role="img"></i>
                       <div className="flex items-center gap-1">
@@ -813,31 +842,61 @@ function App() {
                   ))}
                 </div>
 
-                {/* Feature Flags - Only show for non-AI Advisor plans */}
+                {/* Collapsible Additional Details - Only for non-AI Advisor plans */}
                 {selectedPlan !== 'ai-advisor' && (
                   <>
-                    {/* Divider */}
-                    <div className="border-t border-gray-300 my-3"></div>
+                    {/* Expand/Collapse Button */}
+                    <button
+                      onClick={() => setShowPlanDetails(!showPlanDetails)}
+                      className="flex items-center justify-center gap-2 text-sm text-[#1239FF] hover:text-[#1239FF]/80 font-medium w-full py-2 mt-3"
+                    >
+                      {showPlanDetails ? 'Hide' : 'Show'} additional details
+                      <ChevronDown className={`w-4 h-4 transition-transform ${showPlanDetails ? 'rotate-180' : ''}`} />
+                    </button>
 
-                    {/* Feature Flags */}
-                    <h4 className="text-xs font-semibold text-[#180D43] mb-2 uppercase tracking-wide">Additional Features</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      {featureFlags.map((feature, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <i className={`${feature.icon} ${feature.enabled ? 'text-[#1239FF]' : 'text-gray-400'} text-base`} aria-label={feature.label} role="img"></i>
-                          <div className="flex items-center gap-1">
-                            <div className="flex items-center gap-1.5">
-                              <i className={`fa-sharp fa-solid ${feature.enabled ? 'fa-circle-check text-green-600' : 'fa-circle-xmark text-gray-400'} text-sm`}></i>
-                              <span className={`text-sm ${feature.enabled ? 'text-[#180D43]' : 'text-gray-400'}`}>
-                                {feature.label}
-                                {!feature.enabled && <span className="text-xs ml-1">(Not Included)</span>}
-                              </span>
-                              <Tooltip content={feature.tooltip} position="top" />
+                    {/* Expandable Section */}
+                    {showPlanDetails && (
+                      <div className="mt-3 pt-3 border-t border-gray-300">
+                        {/* Additional Quantifiable Features (indexes 4+) */}
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                          {planFeatures.slice(4).map((feature, index) => (
+                            <div key={index + 4} className="flex items-center gap-2">
+                              <i className={`${feature.icon} text-[#1239FF] text-base`} aria-label={feature.label} role="img"></i>
+                              <div className="flex items-center gap-1">
+                                <div>
+                                  <span className="font-semibold text-[#1239FF]">{feature.value}</span>
+                                  <span className="text-sm text-[#180D43] ml-1">{feature.label}</span>
+                                </div>
+                                <Tooltip content={feature.tooltip} position="top" />
+                              </div>
                             </div>
-                          </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+
+                        {/* Feature Flags */}
+                        {featureFlags.filter(feature => feature.enabled).length > 0 && (
+                          <>
+                            <h4 className="text-xs font-semibold text-[#180D43] mb-2 uppercase tracking-wide">Additional Features</h4>
+                            <div className="grid grid-cols-2 gap-3">
+                              {featureFlags.filter(feature => feature.enabled).map((feature, index) => (
+                                <div key={index} className="flex items-center gap-2">
+                                  <i className={`${feature.icon} text-[#1239FF] text-base`} aria-label={feature.label} role="img"></i>
+                                  <div className="flex items-center gap-1">
+                                    <div className="flex items-center gap-1.5">
+                                      <i className="fa-sharp fa-solid fa-circle-check text-green-600 text-sm"></i>
+                                      <span className="text-sm text-[#180D43]">
+                                        {feature.label}
+                                      </span>
+                                      <Tooltip content={feature.tooltip} position="top" />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -854,6 +913,7 @@ function App() {
           resellerCommission={resellerCommission}
           onUpdatePricing={handlePricingUpdate}
           isEmbedded={embedConfig.isEmbedded}
+          terminology={terminology}
         />
       )}
 
@@ -865,7 +925,7 @@ function App() {
         }}
         count={isEnterpriseRequest ? 0 : count}
         planName={isEnterpriseRequest ? "Enterprise" : currentPlan.name}
-        unitLabel={selectedPlan === 'ai-advisor' ? 'users' : 'companies'}
+        unitLabel={selectedPlan === 'ai-advisor' ? 'users' : terminology.plural}
         onUserAction={(action) => {
           sendUserAction(action, {
             selectedPlan,
@@ -891,6 +951,7 @@ function App() {
           });
         }}
       />
+      </div>
     </div>
   );
 }
