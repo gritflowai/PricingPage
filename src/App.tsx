@@ -5,8 +5,10 @@ import Settings from './components/Settings';
 import ContactModal from './components/ContactModal';
 import Tooltip from './components/Tooltip';
 import RoleSelector from './components/RoleSelector';
+import FeatureComparison from './components/FeatureComparison';
 import { AlertCircle, ChevronDown, Shield, CreditCard, RefreshCw } from 'lucide-react';
 import { useIframeMessaging } from './hooks/useIframeMessaging';
+import { calculateCustomDiscount, type DiscountType } from './utils/discountCalculator';
 
 // Define plan types
 type PlanType = 'ai-advisor' | 'starter' | 'growth' | 'scale';
@@ -77,7 +79,7 @@ const SCALE_PRICING_TIERS: PricingTier[] = [
 ];
 
 // Default plan configurations (synced with Stripe metadata)
-const DEFAULT_PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
+export const DEFAULT_PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
   'ai-advisor': {
     name: 'AI Growth Advisor',
     pricingTiers: AI_PRICING_TIER,
@@ -206,6 +208,18 @@ function formatLargeNumber(num: number): string {
 function getEmbedConfig() {
   const params = new URLSearchParams(window.location.search);
 
+  // Parse discount parameters
+  let discountType: DiscountType = null;
+  let discountValue = 0;
+  let discountLabel = '';
+
+  const discountTypeParam = params.get('discountType');
+  if (discountTypeParam === 'percentage' || discountTypeParam === 'fixed') {
+    discountType = discountTypeParam;
+    discountValue = params.has('discountValue') ? parseFloat(params.get('discountValue')!) : 0;
+    discountLabel = params.get('discountLabel') || '';
+  }
+
   return {
     isEmbedded: params.get('embedded') === 'true',
     theme: params.get('theme') || 'default',
@@ -213,6 +227,13 @@ function getEmbedConfig() {
     initialPlan: params.get('plan') as PlanType | null,
     initialCount: params.has('count') ? parseInt(params.get('count')!, 10) : null,
     initialIsAnnual: params.has('annual') ? params.get('annual') === 'true' : null,
+    initialDiscountType: discountType,
+    initialDiscountValue: discountValue,
+    initialDiscountLabel: discountLabel,
+    initialRoyaltyProcessingEnabled: params.get('royaltyProcessing') === 'true',
+    initialRoyaltyBaseFee: params.has('royaltyBaseFee') ? parseFloat(params.get('royaltyBaseFee')!) : null,
+    initialRoyaltyPerTransaction: params.has('royaltyPerTx') ? parseFloat(params.get('royaltyPerTx')!) : null,
+    initialEstimatedTransactions: params.has('royaltyTxCount') ? parseInt(params.get('royaltyTxCount')!) : null,
   };
 }
 
@@ -221,6 +242,14 @@ function loadSavedSettings(): {
   planConfigs: Record<PlanType, PlanConfig>;
   wholesaleDiscount: number;
   resellerCommission: number;
+  customDiscountType: DiscountType;
+  customDiscountValue: number;
+  customDiscountLabel: string;
+  customDiscountReason: string;
+  royaltyProcessingEnabled: boolean;
+  royaltyBaseFee: number;
+  royaltyPerTransaction: number;
+  estimatedTransactions: number;
 } {
   try {
     const saved = localStorage.getItem('pricingSettings');
@@ -243,7 +272,15 @@ function loadSavedSettings(): {
       return {
         planConfigs: mergedConfigs,
         wholesaleDiscount: parsed.wholesaleDiscount || 0,
-        resellerCommission: parsed.resellerCommission || 0
+        resellerCommission: parsed.resellerCommission || 0,
+        customDiscountType: parsed.customDiscountType || null,
+        customDiscountValue: parsed.customDiscountValue || 0,
+        customDiscountLabel: parsed.customDiscountLabel || '',
+        customDiscountReason: parsed.customDiscountReason || '',
+        royaltyProcessingEnabled: parsed.royaltyProcessingEnabled || false,
+        royaltyBaseFee: parsed.royaltyBaseFee !== undefined ? parsed.royaltyBaseFee : 0,
+        royaltyPerTransaction: parsed.royaltyPerTransaction !== undefined ? parsed.royaltyPerTransaction : 1.82,
+        estimatedTransactions: parsed.estimatedTransactions !== undefined ? parsed.estimatedTransactions : 2
       };
     }
   } catch (error) {
@@ -252,7 +289,15 @@ function loadSavedSettings(): {
   return {
     planConfigs: DEFAULT_PLAN_CONFIGS,
     wholesaleDiscount: 0,
-    resellerCommission: 0
+    resellerCommission: 0,
+    customDiscountType: null,
+    customDiscountValue: 0,
+    customDiscountLabel: '',
+    customDiscountReason: '',
+    royaltyProcessingEnabled: false,
+    royaltyBaseFee: 0,
+    royaltyPerTransaction: 1.82,
+    estimatedTransactions: 2
   };
 }
 
@@ -286,10 +331,35 @@ function App() {
   const [planConfigs, setPlanConfigs] = useState<Record<PlanType, PlanConfig>>(savedSettings.planConfigs);
   const [wholesaleDiscount, setWholesaleDiscount] = useState(savedSettings.wholesaleDiscount);
   const [resellerCommission, setResellerCommission] = useState(savedSettings.resellerCommission);
+  // URL parameters take precedence over saved settings for discounts
+  const [customDiscountType, setCustomDiscountType] = useState<DiscountType>(
+    embedConfig.initialDiscountType ?? savedSettings.customDiscountType
+  );
+  const [customDiscountValue, setCustomDiscountValue] = useState(
+    embedConfig.initialDiscountValue || savedSettings.customDiscountValue
+  );
+  const [customDiscountLabel, setCustomDiscountLabel] = useState(
+    embedConfig.initialDiscountLabel || savedSettings.customDiscountLabel
+  );
+  const [customDiscountReason, setCustomDiscountReason] = useState(savedSettings.customDiscountReason);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showPricingDetails, setShowPricingDetails] = useState(false);
   const [showPlanDetails, setShowPlanDetails] = useState(false);
   const [isEnterpriseRequest, setIsEnterpriseRequest] = useState(false);
+
+  // Royalty Payment Processing state (URL parameters take precedence over saved settings)
+  const [royaltyProcessingEnabled, setRoyaltyProcessingEnabled] = useState(
+    embedConfig.initialRoyaltyProcessingEnabled || savedSettings.royaltyProcessingEnabled
+  );
+  const [royaltyBaseFee, setRoyaltyBaseFee] = useState(
+    embedConfig.initialRoyaltyBaseFee ?? savedSettings.royaltyBaseFee
+  );
+  const [royaltyPerTransaction, setRoyaltyPerTransaction] = useState(
+    embedConfig.initialRoyaltyPerTransaction ?? savedSettings.royaltyPerTransaction
+  );
+  const [estimatedTransactions, setEstimatedTransactions] = useState(
+    embedConfig.initialEstimatedTransactions ?? savedSettings.estimatedTransactions
+  );
 
   const currentPlan = planConfigs[selectedPlan];
 
@@ -308,12 +378,21 @@ function App() {
   const basePrice = calculateBasePrice(count, currentPlan.pricingTiers);
   const totalPrice = basePrice.total;
 
+  // Calculate custom discount (applied after volume discount)
+  const customDiscountAmount = calculateCustomDiscount(
+    totalPrice,
+    customDiscountType,
+    customDiscountValue
+  );
+
   // Apply wholesale discount if applicable (only for non-annual pricing)
-  const wholesaleDiscountAmount = !isAnnual && wholesaleDiscount > 0
+  // Note: Wholesale and custom discounts are mutually exclusive
+  const wholesaleDiscountAmount = !isAnnual && wholesaleDiscount > 0 && customDiscountAmount === 0
     ? totalPrice * (wholesaleDiscount / 100)
     : 0;
 
-  const priceBeforeAnnual = totalPrice - wholesaleDiscountAmount;
+  const priceAfterDiscounts = totalPrice - customDiscountAmount - wholesaleDiscountAmount;
+  const priceBeforeAnnual = priceAfterDiscounts;
   const finalPrice = isAnnual ? priceBeforeAnnual * (10/12) : priceBeforeAnnual;
 
   // Calculate reseller commission
@@ -323,7 +402,15 @@ function App() {
     ? netAmount * (resellerCommission / 100)
     : 0;
 
-  const pricePerUnit = finalPrice / count;
+  // Calculate royalty processing fees (if enabled)
+  const royaltyProcessingFee = royaltyProcessingEnabled
+    ? (royaltyBaseFee * count) + (royaltyPerTransaction * estimatedTransactions * count)
+    : 0;
+
+  // Final price includes royalty processing
+  const finalPriceWithRoyalty = finalPrice + royaltyProcessingFee;
+
+  const pricePerUnit = finalPriceWithRoyalty / count;
 
   // Calculate AI tokens dynamically based on final price
   const calculatedAiTokens = Math.round(finalPrice * currentPlan.aiTokensPerDollar);
@@ -358,7 +445,7 @@ function App() {
         selectedPlan,
         count,
         isAnnual,
-        finalPrice,
+        finalPrice: finalPriceWithRoyalty,
         pricePerUnit,
         totalPrice,
         monthlySavings,
@@ -366,6 +453,29 @@ function App() {
         resellerCommissionAmount,
         wholesaleDiscount,
         resellerCommission,
+        customDiscount: customDiscountAmount > 0 && customDiscountType ? {
+          type: customDiscountType,
+          value: customDiscountValue,
+          label: customDiscountLabel,
+          reason: customDiscountReason,
+          discountAmount: customDiscountAmount
+        } : null,
+        royaltyProcessing: royaltyProcessingEnabled ? {
+          enabled: true,
+          baseFee: royaltyBaseFee,
+          perTransaction: royaltyPerTransaction,
+          estimatedTransactions: estimatedTransactions,
+          totalFee: royaltyProcessingFee
+        } : null,
+        priceBreakdown: {
+          subtotal: totalPrice,
+          volumeDiscount: 0, // Volume discount is baked into totalPrice from tiers
+          customDiscount: customDiscountAmount,
+          wholesaleDiscount: wholesaleDiscountAmount,
+          annualSavings: monthlySavings,
+          royaltyProcessingFee: royaltyProcessingFee,
+          finalMonthlyPrice: finalPriceWithRoyalty
+        },
         planDetails: {
           name: currentPlan.name,
           connections: currentPlan.connections,
@@ -382,6 +492,7 @@ function App() {
     count,
     isAnnual,
     finalPrice,
+    finalPriceWithRoyalty,
     pricePerUnit,
     totalPrice,
     monthlySavings,
@@ -389,6 +500,16 @@ function App() {
     resellerCommissionAmount,
     wholesaleDiscount,
     resellerCommission,
+    customDiscountType,
+    customDiscountValue,
+    customDiscountLabel,
+    customDiscountReason,
+    customDiscountAmount,
+    royaltyProcessingEnabled,
+    royaltyBaseFee,
+    royaltyPerTransaction,
+    estimatedTransactions,
+    royaltyProcessingFee,
     currentPlan,
     calculatedAiTokens,
     sendSelectionUpdate,
@@ -408,7 +529,7 @@ function App() {
     connections: "Number of data integrations available (APIs, databases, etc.)",
     scorecards: "Number of performance scorecards you can create per company",
     metricsPerScorecard: "Number of key performance indicators tracked per scorecard",
-    aiTokens: "Monthly AI credits for automated insights and analysis. Calculated as final monthly cost × 166,666 tokens per dollar. Includes all discounts.",
+    aiTokens: "You receive $0.25 in AI tokens for every $1 spent on your plan (25% of plan cost). Choose any AI model you want - more expensive models just use tokens faster. Use for insights, recommendations, and automations.",
     historicData: "Years of historical data retention and analysis",
     dailySync: "Automatic daily synchronization of your data",
     immediateSync: "On-demand instant data sync whenever you need it",
@@ -465,18 +586,42 @@ function App() {
   const handlePricingUpdate = (
     updatedConfigs: Record<PlanType, PlanConfig>,
     newWholesaleDiscount: number,
-    newResellerCommission: number
+    newResellerCommission: number,
+    newCustomDiscountType: DiscountType,
+    newCustomDiscountValue: number,
+    newCustomDiscountLabel: string,
+    newCustomDiscountReason: string,
+    newRoyaltyProcessingEnabled: boolean,
+    newRoyaltyBaseFee: number,
+    newRoyaltyPerTransaction: number,
+    newEstimatedTransactions: number
   ) => {
     setPlanConfigs(updatedConfigs);
     setWholesaleDiscount(newWholesaleDiscount);
     setResellerCommission(newResellerCommission);
+    setCustomDiscountType(newCustomDiscountType);
+    setCustomDiscountValue(newCustomDiscountValue);
+    setCustomDiscountLabel(newCustomDiscountLabel);
+    setCustomDiscountReason(newCustomDiscountReason);
+    setRoyaltyProcessingEnabled(newRoyaltyProcessingEnabled);
+    setRoyaltyBaseFee(newRoyaltyBaseFee);
+    setRoyaltyPerTransaction(newRoyaltyPerTransaction);
+    setEstimatedTransactions(newEstimatedTransactions);
 
     // Save to localStorage
     try {
       localStorage.setItem('pricingSettings', JSON.stringify({
         planConfigs: updatedConfigs,
         wholesaleDiscount: newWholesaleDiscount,
-        resellerCommission: newResellerCommission
+        resellerCommission: newResellerCommission,
+        customDiscountType: newCustomDiscountType,
+        customDiscountValue: newCustomDiscountValue,
+        customDiscountLabel: newCustomDiscountLabel,
+        customDiscountReason: newCustomDiscountReason,
+        royaltyProcessingEnabled: newRoyaltyProcessingEnabled,
+        royaltyBaseFee: newRoyaltyBaseFee,
+        royaltyPerTransaction: newRoyaltyPerTransaction,
+        estimatedTransactions: newEstimatedTransactions
       }));
     } catch (error) {
       console.error('Failed to save settings:', error);
@@ -491,13 +636,19 @@ function App() {
   // Use min-h-fit for embedded mode to allow flexible height
   const minHeight = embedConfig.isEmbedded ? 'min-h-fit' : 'min-h-screen';
 
+  // Compact spacing for embedded mode
+  const outerPadding = embedConfig.isEmbedded ? 'p-0' : 'p-2';
+  const topMargin = embedConfig.isEmbedded ? 'pt-0' : 'pt-3';
+  const bottomMargin = embedConfig.isEmbedded ? 'mb-2' : 'mb-8';
+  const gridGap = embedConfig.isEmbedded ? 'gap-2' : 'gap-3';
+
   return (
     <div className={`${minHeight} ${backgroundColor}`}>
       {/* Role Selector at the very top */}
-      <RoleSelector selected={userType} onChange={setUserType} />
+      <RoleSelector selected={userType} onChange={setUserType} isEmbedded={embedConfig.isEmbedded} />
 
-      <div className="p-2">
-        <div className="max-w-6xl mx-auto mb-8 pt-3">
+      <div className={outerPadding}>
+        <div className={`max-w-6xl mx-auto ${bottomMargin} ${topMargin}`}>
         <div className="bg-white rounded-lg shadow-sm border border-[#1239FF]/10 p-1 overflow-visible relative">
           <div className="flex flex-col md:flex-row gap-2">
             <button
@@ -508,8 +659,8 @@ function App() {
                   : 'bg-transparent text-[#180D43] hover:bg-gray-50'
               }`}
             >
-              <div className="font-bold text-base md:text-lg">AI Growth Advisor</div>
-              <div className="text-xs md:text-sm mt-1 opacity-80">$19/user • 0 connections</div>
+              <div className="font-bold text-sm sm:text-base md:text-lg">AI Growth Advisor</div>
+              <div className="text-[11px] sm:text-xs md:text-sm mt-1 opacity-80">$19/user • 0 connections</div>
             </button>
             <button
               onClick={() => setSelectedPlan('starter')}
@@ -519,8 +670,8 @@ function App() {
                   : 'bg-transparent text-[#180D43] hover:bg-gray-50'
               }`}
             >
-              <div className="font-bold text-base md:text-lg">Starter</div>
-              <div className="text-xs md:text-sm mt-1 opacity-80">1 connection • From $90</div>
+              <div className="font-bold text-sm sm:text-base md:text-lg">Starter</div>
+              <div className="text-[11px] sm:text-xs md:text-sm mt-1 opacity-80">1 connection • From $90</div>
             </button>
             <button
               onClick={() => setSelectedPlan('growth')}
@@ -531,13 +682,13 @@ function App() {
               }`}
             >
               {/* Most Popular Badge */}
-              <div className="absolute -top-2.5 md:-top-3 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap">
-                <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] md:text-xs font-bold px-3 md:px-4 py-1 rounded-full shadow-md">
+              <div className="absolute -top-2.5 md:-top-3 left-1/2 -translate-x-1/2 z-10">
+                <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] md:text-xs font-bold px-2 sm:px-3 md:px-4 py-1 rounded-full shadow-md whitespace-nowrap">
                   MOST POPULAR
                 </div>
               </div>
-              <div className="font-bold text-base md:text-lg">Growth</div>
-              <div className="text-xs md:text-sm mt-1 opacity-80">3 connections • From $120</div>
+              <div className="font-bold text-sm sm:text-base md:text-lg">Growth</div>
+              <div className="text-[11px] sm:text-xs md:text-sm mt-1 opacity-80">3 connections • From $120</div>
             </button>
             <button
               onClick={() => setSelectedPlan('scale')}
@@ -547,8 +698,8 @@ function App() {
                   : 'bg-transparent text-[#180D43] hover:bg-gray-50'
               }`}
             >
-              <div className="font-bold text-base md:text-lg">Scale</div>
-              <div className="text-xs md:text-sm mt-1 opacity-80">5 connections • From $150</div>
+              <div className="font-bold text-sm sm:text-base md:text-lg">Scale</div>
+              <div className="text-[11px] sm:text-xs md:text-sm mt-1 opacity-80">5 connections • From $150</div>
             </button>
             <button
               onClick={() => {
@@ -557,17 +708,17 @@ function App() {
               }}
               className="flex-1 px-4 py-3 rounded-md smooth-transition bg-gradient-to-r from-gray-700 to-gray-800 text-white hover:from-[#180D43] hover:to-[#1239FF] hover:shadow-lg"
             >
-              <div className="font-bold text-base md:text-lg">Enterprise</div>
-              <div className="text-xs md:text-sm mt-1 opacity-90">Custom pricing • Unlimited</div>
+              <div className="font-bold text-sm sm:text-base md:text-lg">Enterprise</div>
+              <div className="text-[11px] sm:text-xs md:text-sm mt-1 opacity-90">Custom pricing • Unlimited</div>
             </button>
           </div>
         </div>
       </div>
 
-      <PricingToggle isAnnual={isAnnual} setIsAnnual={setIsAnnual} monthlySavings={monthlySavings} />
-      
+      <PricingToggle isAnnual={isAnnual} setIsAnnual={setIsAnnual} monthlySavings={monthlySavings} isEmbedded={embedConfig.isEmbedded} />
+
       <div className="max-w-4xl mx-auto">
-        <div className="grid md:grid-cols-2 gap-3">
+        <div className={`grid md:grid-cols-2 ${gridGap}`}>
           <div className="bg-white rounded-lg shadow-sm border border-[#1239FF]/10 overflow-hidden">
             <div className="bg-[#1239FF] text-white p-2">
               <h2 className="text-sm font-semibold">Configure Your Plan</h2>
@@ -670,8 +821,8 @@ function App() {
               <div className="p-3">
               {/* Simplified Price Display */}
               <div className="text-center py-4">
-                <div className="text-4xl md:text-5xl font-bold gradient-text-primary mb-2 animate-count" role="status" aria-live="polite" aria-label={`Price: $${formatNumber(finalPrice)} per month`}>
-                  ${formatNumber(finalPrice)}
+                <div className="text-4xl md:text-5xl font-bold gradient-text-primary mb-2 animate-count" role="status" aria-live="polite" aria-label={`Price: $${formatNumber(finalPriceWithRoyalty)} per month`}>
+                  ${formatNumber(finalPriceWithRoyalty)}
                   <span className="text-lg md:text-xl font-normal text-[#180D43]/70">/mo</span>
                 </div>
                 <div className="text-base md:text-lg text-[#180D43]/80 mb-1">
@@ -679,7 +830,7 @@ function App() {
                 </div>
                 {isAnnual && (
                   <div className="text-xs md:text-sm text-green-600 font-medium">
-                    Billed annually (${formatNumber(finalPrice * 12)}/year)
+                    Billed annually (${formatNumber(finalPriceWithRoyalty * 12)}/year)
                   </div>
                 )}
               </div>
@@ -692,7 +843,7 @@ function App() {
                       selectedPlan,
                       count,
                       isAnnual,
-                      finalPrice,
+                      finalPrice: finalPriceWithRoyalty,
                       pricePerUnit,
                       totalPrice,
                       monthlySavings,
@@ -775,11 +926,48 @@ function App() {
                         </div>
                       )}
 
+                      {customDiscountAmount > 0 && (
+                        <div className="border-b border-gray-200 pb-2">
+                          <div className="flex justify-between text-green-600">
+                            <span>
+                              {customDiscountLabel || 'Custom Discount'}
+                              {customDiscountType === 'percentage' && ` (${customDiscountValue}%)`}
+                            </span>
+                            <span>-${formatNumber(customDiscountAmount)}/mo</span>
+                          </div>
+                        </div>
+                      )}
+
                       {isAnnual && (
                         <div className="border-b border-gray-200 pb-2">
                           <div className="flex justify-between text-green-600">
                             <span>Annual discount (2 months free)</span>
                             <span>-${formatNumber(priceBeforeAnnual * (2/12))}/mo</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {royaltyProcessingEnabled && (
+                        <div className="border-b border-gray-200 pb-2">
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-[#180D43]/70 font-medium">
+                              <span>Royalty processing ({count} {terminology.plural})</span>
+                              <span>${formatNumber(royaltyProcessingFee)}/mo</span>
+                            </div>
+                            {royaltyBaseFee > 0 && (
+                              <div className="flex justify-between text-xs text-[#180D43]/50 ml-4">
+                                <span>• Base fee ({count} × ${formatNumber(royaltyBaseFee)})</span>
+                                <span>${formatNumber(royaltyBaseFee * count)}/mo</span>
+                              </div>
+                            )}
+                            {royaltyPerTransaction > 0 && estimatedTransactions > 0 && (
+                              <>
+                                <div className="flex justify-between text-xs text-[#180D43]/50 ml-4">
+                                  <span>• Transaction fees (~{estimatedTransactions} txns @ ${formatNumber(royaltyPerTransaction)})</span>
+                                  <span>${formatNumber(royaltyPerTransaction * estimatedTransactions * count)}/mo</span>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       )}
@@ -806,7 +994,7 @@ function App() {
                       <div className="pt-1">
                         <div className="flex justify-between font-medium">
                           <span>Final Monthly Cost:</span>
-                          <span className="text-[#1239FF]">${formatNumber(finalPrice)}/mo</span>
+                          <span className="text-[#1239FF]">${formatNumber(finalPriceWithRoyalty)}/mo</span>
                         </div>
                       </div>
                     </div>
@@ -819,6 +1007,15 @@ function App() {
                   <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                   <div className="text-sm text-red-700">
                     Wholesale pricing is not available with annual billing. Switch to monthly billing to apply the wholesale discount.
+                  </div>
+                </div>
+              )}
+
+              {wholesaleDiscount > 0 && customDiscountAmount > 0 && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-red-700">
+                    Custom discounts cannot be combined with wholesale pricing. Please use one or the other.
                   </div>
                 </div>
               )}
@@ -906,14 +1103,26 @@ function App() {
         </div>
       </div>
 
+      {/* Feature Comparison Table */}
+      <FeatureComparison selectedPlan={selectedPlan} />
+
       {!embedConfig.hideSettings && (
         <Settings
           planConfigs={planConfigs}
           wholesaleDiscount={wholesaleDiscount}
           resellerCommission={resellerCommission}
+          customDiscountType={customDiscountType}
+          customDiscountValue={customDiscountValue}
+          customDiscountLabel={customDiscountLabel}
+          customDiscountReason={customDiscountReason}
+          royaltyProcessingEnabled={royaltyProcessingEnabled}
+          royaltyBaseFee={royaltyBaseFee}
+          royaltyPerTransaction={royaltyPerTransaction}
+          estimatedTransactions={estimatedTransactions}
           onUpdatePricing={handlePricingUpdate}
           isEmbedded={embedConfig.isEmbedded}
           terminology={terminology}
+          defaultPlanConfigs={DEFAULT_PLAN_CONFIGS}
         />
       )}
 
@@ -931,7 +1140,7 @@ function App() {
             selectedPlan,
             count,
             isAnnual,
-            finalPrice,
+            finalPrice: finalPriceWithRoyalty,
             pricePerUnit,
             totalPrice,
             monthlySavings,

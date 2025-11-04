@@ -4,11 +4,15 @@ interface PricingToggleProps {
   isAnnual: boolean;
   setIsAnnual: (value: boolean) => void;
   monthlySavings?: number;
+  isEmbedded?: boolean;
 }
 
-const PricingToggle: React.FC<PricingToggleProps> = ({ isAnnual, setIsAnnual, monthlySavings }) => {
+const PricingToggle: React.FC<PricingToggleProps> = ({ isAnnual, setIsAnnual, monthlySavings, isEmbedded = false }) => {
+  // Use compact bottom margin for embedded mode
+  const bottomMargin = isEmbedded ? 'mb-3' : 'mb-8';
+
   return (
-    <div className="flex flex-col items-center mb-8">
+    <div className={`flex flex-col items-center ${bottomMargin}`}>
       <div className="bg-white rounded-lg shadow-md p-1 inline-flex glow-blue">
         <button
           onClick={() => setIsAnnual(false)}

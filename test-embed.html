@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Embedded Pricing Calculator Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .embed-wrapper {
+            background: white;
+            border: 3px solid red;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        iframe {
+            width: 100%;
+            border: none;
+            display: block;
+        }
+        .info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .info h2 {
+            margin-top: 0;
+            color: #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Pricing Calculator - Embedded Mode Test</h1>
+
+        <div class="info">
+            <h2>Testing Embedded View</h2>
+            <p>This page demonstrates the pricing calculator embedded with the following parameters:</p>
+            <ul>
+                <li><code>?embedded=true</code> - Enables compact mode</li>
+                <li><code>&theme=transparent</code> - Transparent background</li>
+            </ul>
+            <p><strong>Red border shows the iframe boundaries. The calculator should fit snugly without excessive whitespace.</strong></p>
+        </div>
+
+        <div class="embed-wrapper">
+            <iframe
+                src="http://localhost:3000/?embedded=true&theme=transparent"
+                height="900"
+                scrolling="no"
+                id="pricing-iframe"
+            ></iframe>
+        </div>
+
+        <div style="margin-top: 20px; text-align: center; color: #666;">
+            <p>Switch between different views:</p>
+            <button onclick="loadView('embedded')">Embedded Mode (Compact)</button>
+            <button onclick="loadView('normal')">Normal Mode</button>
+        </div>
+    </div>
+
+    <script>
+        function loadView(mode) {
+            const iframe = document.getElementById('pricing-iframe');
+            if (mode === 'embedded') {
+                iframe.src = 'http://localhost:3000/?embedded=true&theme=transparent';
+            } else {
+                iframe.src = 'http://localhost:3000/';
+            }
+        }
+
+        // Auto-resize iframe based on content
+        window.addEventListener('message', function(event) {
+            if (event.data.type === 'RESIZE_IFRAME') {
+                const iframe = document.getElementById('pricing-iframe');
+                iframe.style.height = event.data.height + 'px';
+            }
+        });
+    </script>
+</body>
+</html>

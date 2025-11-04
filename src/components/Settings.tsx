@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Settings2, X, Plus, AlertCircle } from 'lucide-react';
+import { Settings2, X, Plus, AlertCircle, RotateCcw } from 'lucide-react';
+import { type DiscountType } from '../utils/discountCalculator';
 
 interface PricingTier {
   firstUnit: number;
@@ -28,16 +29,32 @@ interface PlanConfig {
 }
 
 type PlanType = 'ai-advisor' | 'starter' | 'growth' | 'scale';
-type TabType = PlanType | 'reseller';
+type TabType = PlanType | 'reseller' | 'discounts' | 'royalty-processing';
 
 interface SettingsProps {
   planConfigs: Record<PlanType, PlanConfig>;
   wholesaleDiscount: number;
   resellerCommission: number;
+  customDiscountType: DiscountType;
+  customDiscountValue: number;
+  customDiscountLabel: string;
+  customDiscountReason: string;
+  royaltyProcessingEnabled: boolean;
+  royaltyBaseFee: number;
+  royaltyPerTransaction: number;
+  estimatedTransactions: number;
   onUpdatePricing: (
     configs: Record<PlanType, PlanConfig>,
     wholesaleDiscount: number,
-    resellerCommission: number
+    resellerCommission: number,
+    customDiscountType: DiscountType,
+    customDiscountValue: number,
+    customDiscountLabel: string,
+    customDiscountReason: string,
+    royaltyProcessingEnabled: boolean,
+    royaltyBaseFee: number,
+    royaltyPerTransaction: number,
+    estimatedTransactions: number
   ) => void;
   isEmbedded?: boolean;
   terminology?: {
@@ -45,21 +62,51 @@ interface SettingsProps {
     plural: string;
     capitalized: string;
   };
+  defaultPlanConfigs: Record<PlanType, PlanConfig>;
 }
 
 const Settings: React.FC<SettingsProps> = ({
   planConfigs,
   wholesaleDiscount: initialWholesaleDiscount,
   resellerCommission: initialResellerCommission,
+  customDiscountType: initialCustomDiscountType,
+  customDiscountValue: initialCustomDiscountValue,
+  customDiscountLabel: initialCustomDiscountLabel,
+  customDiscountReason: initialCustomDiscountReason,
+  royaltyProcessingEnabled: initialRoyaltyProcessingEnabled,
+  royaltyBaseFee: initialRoyaltyBaseFee,
+  royaltyPerTransaction: initialRoyaltyPerTransaction,
+  estimatedTransactions: initialEstimatedTransactions,
   onUpdatePricing,
   isEmbedded = false,
-  terminology = { singular: 'company', plural: 'companies', capitalized: 'Companies' }
+  terminology = { singular: 'company', plural: 'companies', capitalized: 'Companies' },
+  defaultPlanConfigs
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('ai-advisor');
   const [updatedConfigs, setUpdatedConfigs] = useState<Record<PlanType, PlanConfig>>(planConfigs);
   const [wholesaleDiscount, setWholesaleDiscount] = useState(initialWholesaleDiscount);
   const [resellerCommission, setResellerCommission] = useState(initialResellerCommission);
+  const [customDiscountType, setCustomDiscountType] = useState<DiscountType>(initialCustomDiscountType);
+  const [customDiscountValue, setCustomDiscountValue] = useState(initialCustomDiscountValue);
+  const [customDiscountLabel, setCustomDiscountLabel] = useState(initialCustomDiscountLabel);
+  const [customDiscountReason, setCustomDiscountReason] = useState(initialCustomDiscountReason);
+  const [royaltyProcessingEnabled, setRoyaltyProcessingEnabled] = useState(initialRoyaltyProcessingEnabled);
+  const [royaltyBaseFee, setRoyaltyBaseFee] = useState(initialRoyaltyBaseFee);
+  const [estimatedTransactions, setEstimatedTransactions] = useState(initialEstimatedTransactions);
+
+  // Split out WorldPay fee and service fee (initialize from total if already set)
+  const [worldPayFee, setWorldPayFee] = useState(() => {
+    // If total is 1.82 (default), use 0.32, otherwise try to preserve ratio
+    return initialRoyaltyPerTransaction === 1.82 ? 0.32 : 0.32;
+  });
+  const [achServiceFee, setAchServiceFee] = useState(() => {
+    // If total is 1.82 (default), use 1.50, otherwise calculate from remainder
+    return initialRoyaltyPerTransaction === 1.82 ? 1.50 : Math.max(0, initialRoyaltyPerTransaction - 0.32);
+  });
+
+  // Update total when individual fees change
+  const totalPerTransaction = worldPayFee + achServiceFee;
 
   const handleSave = () => {
     // Sort tiers by firstUnit for each plan before saving
@@ -73,8 +120,74 @@ const Settings: React.FC<SettingsProps> = ({
       return acc;
     }, {} as Record<PlanType, PlanConfig>);
 
-    onUpdatePricing(sortedConfigs, wholesaleDiscount, resellerCommission);
+    onUpdatePricing(
+      sortedConfigs,
+      wholesaleDiscount,
+      resellerCommission,
+      customDiscountType,
+      customDiscountValue,
+      customDiscountLabel,
+      customDiscountReason,
+      royaltyProcessingEnabled,
+      royaltyBaseFee,
+      totalPerTransaction, // Use calculated total
+      estimatedTransactions
+    );
     setIsOpen(false);
+  };
+
+  const handleReset = () => {
+    const confirmReset = window.confirm(
+      'Are you sure you want to reset all pricing settings to defaults? This cannot be undone.'
+    );
+
+    if (confirmReset) {
+      // Clear localStorage
+      try {
+        localStorage.removeItem('pricingSettings');
+      } catch (error) {
+        console.error('Failed to clear localStorage:', error);
+      }
+
+      // Reset all local state to defaults
+      setUpdatedConfigs(defaultPlanConfigs);
+      setWholesaleDiscount(0);
+      setResellerCommission(0);
+      setCustomDiscountType(null);
+      setCustomDiscountValue(0);
+      setCustomDiscountLabel('');
+      setCustomDiscountReason('');
+      setRoyaltyProcessingEnabled(false);
+      setRoyaltyBaseFee(0);
+      setWorldPayFee(0.32);
+      setAchServiceFee(1.50);
+      setEstimatedTransactions(2);
+
+      // Optionally, you can also save the defaults immediately
+      onUpdatePricing(
+        defaultPlanConfigs,
+        0,
+        0,
+        null,
+        0,
+        '',
+        '',
+        false,
+        0,
+        1.82,
+        2
+      );
+
+      // Keep modal open so user can see the reset took effect
+      alert('Pricing settings have been reset to defaults.');
+    }
+  };
+
+  const handleClearDiscount = () => {
+    setCustomDiscountType(null);
+    setCustomDiscountValue(0);
+    setCustomDiscountLabel('');
+    setCustomDiscountReason('');
   };
 
   const updatePlanTier = (plan: PlanType, index: number, field: keyof PricingTier, value: number) => {
@@ -180,6 +293,26 @@ const Settings: React.FC<SettingsProps> = ({
         }`}
       >
         Reseller
+      </button>
+      <button
+        onClick={() => setActiveTab('discounts')}
+        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+          activeTab === 'discounts'
+            ? 'bg-[#1239FF] text-white'
+            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+        }`}
+      >
+        Discounts
+      </button>
+      <button
+        onClick={() => setActiveTab('royalty-processing')}
+        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+          activeTab === 'royalty-processing'
+            ? 'bg-[#1239FF] text-white'
+            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+        }`}
+      >
+        Royalty Processing
       </button>
     </div>
   );
@@ -445,6 +578,131 @@ const Settings: React.FC<SettingsProps> = ({
     );
   };
 
+  const renderDiscountsSettings = () => (
+    <div className="space-y-8">
+      <div>
+        <h3 className="text-lg font-semibold mb-4">Custom Discount</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Discount Type
+            </label>
+            <div className="flex gap-4">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="discountType"
+                  value="percentage"
+                  checked={customDiscountType === 'percentage'}
+                  onChange={() => setCustomDiscountType('percentage')}
+                  className="rounded-full border-gray-300 text-[#1239FF] focus:ring-[#1239FF] h-4 w-4"
+                />
+                <span className="ml-2 text-sm text-gray-700">Percentage</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="discountType"
+                  value="fixed"
+                  checked={customDiscountType === 'fixed'}
+                  onChange={() => setCustomDiscountType('fixed')}
+                  className="rounded-full border-gray-300 text-[#1239FF] focus:ring-[#1239FF] h-4 w-4"
+                />
+                <span className="ml-2 text-sm text-gray-700">Fixed Amount</span>
+              </label>
+            </div>
+          </div>
+
+          {customDiscountType && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Discount Value
+                </label>
+                <div className="flex items-center">
+                  {customDiscountType === 'percentage' && (
+                    <>
+                      <input
+                        type="number"
+                        value={customDiscountValue}
+                        onChange={(e) => setCustomDiscountValue(Number(e.target.value))}
+                        className="w-32 rounded-md border border-gray-300 px-3 py-2"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                      />
+                      <span className="text-gray-500 ml-2">%</span>
+                    </>
+                  )}
+                  {customDiscountType === 'fixed' && (
+                    <>
+                      <span className="text-gray-500 mr-2">$</span>
+                      <input
+                        type="number"
+                        value={customDiscountValue}
+                        onChange={(e) => setCustomDiscountValue(Number(e.target.value))}
+                        className="w-32 rounded-md border border-gray-300 px-3 py-2"
+                        min="0"
+                        step="0.01"
+                      />
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Discount Label (optional)
+                </label>
+                <input
+                  type="text"
+                  value={customDiscountLabel}
+                  onChange={(e) => setCustomDiscountLabel(e.target.value)}
+                  placeholder="e.g., Q1 Promotion, Enterprise Discount"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  maxLength={50}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  This label will be shown to customers in the pricing summary
+                </p>
+              </div>
+
+              {wholesaleDiscount > 0 && customDiscountValue > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-red-700">
+                    <strong>Warning:</strong> Custom discounts cannot be combined with wholesale pricing.
+                    Only one discount type will be applied. Please clear the wholesale discount or this custom discount.
+                  </div>
+                </div>
+              )}
+
+              {customDiscountValue > 0 && (
+                <div className="pt-4">
+                  <button
+                    onClick={handleClearDiscount}
+                    className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                  >
+                    Clear Discount
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {!customDiscountType && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+              <p className="text-gray-600 mb-2">No discount applied</p>
+              <p className="text-sm text-gray-500">
+                Select a discount type above to add a custom discount to this quote
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   const renderResellerSettings = () => (
     <div className="space-y-8">
       <div>
@@ -526,6 +784,151 @@ const Settings: React.FC<SettingsProps> = ({
     </div>
   );
 
+  const renderRoyaltyProcessingSettings = () => (
+    <div className="space-y-8">
+      <div>
+        <h3 className="text-lg font-semibold mb-4">Royalty Payment Processing</h3>
+
+        <div className="mb-6">
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={royaltyProcessingEnabled}
+              onChange={(e) => setRoyaltyProcessingEnabled(e.target.checked)}
+              className="rounded border-gray-300 text-[#1239FF] focus:ring-[#1239FF] h-4 w-4"
+            />
+            <span className="ml-2 text-sm font-medium text-gray-700">
+              Enable Royalty Payment Processing
+            </span>
+          </label>
+          <p className="text-sm text-gray-600 mt-2 ml-6">
+            Add automated ACH royalty payment processing to franchise locations
+          </p>
+        </div>
+
+        {royaltyProcessingEnabled && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Base Fee per Location (Monthly)
+              </label>
+              <div className="flex items-center">
+                <span className="text-gray-500 mr-2">$</span>
+                <input
+                  type="number"
+                  value={royaltyBaseFee}
+                  onChange={(e) => setRoyaltyBaseFee(Number(e.target.value))}
+                  className="w-32 rounded-md border border-gray-300 px-3 py-2"
+                  min="0"
+                  step="0.01"
+                />
+                <span className="text-gray-500 ml-2">per location/month</span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Monthly platform fee for royalty processing infrastructure
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Per Transaction Fee (ACH)
+              </label>
+
+              <div className="space-y-3 ml-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    WorldPay processing fee
+                  </label>
+                  <div className="flex items-center">
+                    <span className="text-gray-500 mr-2">$</span>
+                    <input
+                      type="number"
+                      value={worldPayFee}
+                      onChange={(e) => setWorldPayFee(Number(e.target.value))}
+                      className="w-32 rounded-md border border-gray-300 px-3 py-2"
+                      min="0"
+                      step="0.01"
+                    />
+                    <span className="text-gray-500 ml-2">per transaction</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    ACH processing service fee
+                  </label>
+                  <div className="flex items-center">
+                    <span className="text-gray-500 mr-2">$</span>
+                    <input
+                      type="number"
+                      value={achServiceFee}
+                      onChange={(e) => setAchServiceFee(Number(e.target.value))}
+                      className="w-32 rounded-md border border-gray-300 px-3 py-2"
+                      min="0"
+                      step="0.01"
+                    />
+                    <span className="text-gray-500 ml-2">per transaction</span>
+                  </div>
+                </div>
+
+                <div className="bg-gray-100 border border-gray-300 rounded-lg p-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-700">Total per transaction:</span>
+                    <span className="text-lg font-bold text-[#1239FF]">${totalPerTransaction.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Estimated Transactions per Location (Monthly)
+              </label>
+              <input
+                type="number"
+                value={estimatedTransactions}
+                onChange={(e) => setEstimatedTransactions(Number(e.target.value))}
+                className="w-32 rounded-md border border-gray-300 px-3 py-2"
+                min="0"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Used for pricing estimates only (typically 1-4 per month for royalty + territory fees)
+              </p>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h4 className="font-medium text-gray-900 mb-2">Pricing Example (10 locations)</h4>
+              <div className="space-y-2 text-sm text-gray-600">
+                <div className="flex justify-between">
+                  <span>Base fee (10 locations × ${royaltyBaseFee.toFixed(2)}):</span>
+                  <span>${(royaltyBaseFee * 10).toFixed(2)}/mo</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Transaction fees ({estimatedTransactions} × 10 × ${totalPerTransaction.toFixed(2)}):</span>
+                  <span>${(totalPerTransaction * estimatedTransactions * 10).toFixed(2)}/mo</span>
+                </div>
+                <div className="flex justify-between font-medium text-gray-900 border-t border-gray-200 pt-2 mt-2">
+                  <span>Total royalty processing cost:</span>
+                  <span>${((royaltyBaseFee * 10) + (totalPerTransaction * estimatedTransactions * 10)).toFixed(2)}/mo</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-medium text-blue-900 mb-2">How It Works</h4>
+              <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                <li>Automatically collect royalty payments via ACH from franchise locations</li>
+                <li>Process territory fees, marketing fund contributions, and royalty payments</li>
+                <li>WorldPay handles ACH processing ($0.32 per transaction)</li>
+                <li>Reconciliation and reporting included in base fee</li>
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   // Use absolute positioning for embedded mode to stay within iframe bounds
   const positionClass = isEmbedded ? 'absolute' : 'fixed';
 
@@ -557,22 +960,34 @@ const Settings: React.FC<SettingsProps> = ({
 
             <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 200px)' }}>
               {activeTab === 'reseller' ? renderResellerSettings() :
+               activeTab === 'discounts' ? renderDiscountsSettings() :
+               activeTab === 'royalty-processing' ? renderRoyaltyProcessingSettings() :
                renderPlanSettings(activeTab as PlanType)}
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-4">
+            <div className="p-6 border-t border-gray-200 flex justify-between items-center">
               <button
-                onClick={() => setIsOpen(false)}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                onClick={handleReset}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                title="Reset all pricing settings to defaults"
               >
-                Cancel
+                <RotateCcw className="w-4 h-4" />
+                Reset to Defaults
               </button>
-              <button
-                onClick={handleSave}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-              >
-                Save Changes
-              </button>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  Save Changes
+                </button>
+              </div>
             </div>
           </div>
         </div>

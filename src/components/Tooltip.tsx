@@ -18,35 +18,37 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'top' }
   };
 
   const arrowClasses = {
-    top: 'top-full left-1/2 -translate-x-1/2 border-t-gray-800 border-l-transparent border-r-transparent border-b-transparent',
-    bottom: 'bottom-full left-1/2 -translate-x-1/2 border-b-gray-800 border-l-transparent border-r-transparent border-t-transparent',
-    left: 'left-full top-1/2 -translate-y-1/2 border-l-gray-800 border-t-transparent border-b-transparent border-r-transparent',
-    right: 'right-full top-1/2 -translate-y-1/2 border-r-gray-800 border-t-transparent border-b-transparent border-l-transparent'
+    top: 'top-full left-1/2 -translate-x-1/2 border-t-gray-900 border-l-transparent border-r-transparent border-b-transparent',
+    bottom: 'bottom-full left-1/2 -translate-x-1/2 border-b-gray-900 border-l-transparent border-r-transparent border-t-transparent',
+    left: 'left-full top-1/2 -translate-y-1/2 border-l-gray-900 border-t-transparent border-b-transparent border-r-transparent',
+    right: 'right-full top-1/2 -translate-y-1/2 border-r-gray-900 border-t-transparent border-b-transparent border-l-transparent'
   };
 
   return (
-    <div className="relative inline-flex items-center">
+    <div className="relative inline-flex items-center group">
       <div
         onMouseEnter={() => setIsVisible(true)}
         onMouseLeave={() => setIsVisible(false)}
         onFocus={() => setIsVisible(true)}
         onBlur={() => setIsVisible(false)}
-        className="cursor-help"
+        onTouchStart={() => setIsVisible(true)}
+        onTouchEnd={() => setTimeout(() => setIsVisible(false), 2000)}
+        className="cursor-help touch-manipulation"
         tabIndex={0}
         aria-label={content}
       >
-        {children || <HelpCircle className="w-4 h-4 text-gray-400 hover:text-[#1239FF] smooth-transition" />}
+        {children || <HelpCircle className="w-4 h-4 text-gray-400 hover:text-[#1239FF] transition-colors duration-150" />}
       </div>
 
       {isVisible && (
         <div
-          className={`absolute z-50 ${positionClasses[position]} animate-count`}
+          className={`absolute z-[100] ${positionClasses[position]} pointer-events-none animate-in fade-in duration-150`}
           role="tooltip"
         >
-          <div className="bg-gray-800 text-white text-xs rounded-lg py-2 px-3 max-w-xs shadow-lg">
+          <div className="bg-gray-900 text-white text-xs leading-relaxed rounded-lg py-2 px-3 max-w-[240px] shadow-xl whitespace-normal">
             {content}
           </div>
-          <div className={`absolute w-0 h-0 border-4 ${arrowClasses[position]}`}></div>
+          <div className={`absolute w-0 h-0 border-[5px] ${arrowClasses[position]}`}></div>
         </div>
       )}
     </div>

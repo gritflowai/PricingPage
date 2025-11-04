@@ -94,11 +94,36 @@ Customize the pricing calculator behavior using URL parameters:
 - `&plan=growth` - Pre-select a plan (`ai-advisor`, `starter`, `growth`, `scale`)
 - `&count=25` - Pre-fill companies/users count
 - `&annual=true` - Pre-select annual billing (`true` or `false`)
+- `&discountType=percentage` - Pre-apply a discount type (`percentage` or `fixed`)
+- `&discountValue=15` - Pre-apply discount value (percentage as number or dollar amount)
+- `&discountLabel=Q1%20Promotion` - Pre-apply discount label (URL-encoded)
+- `&royaltyProcessing=true` - Enable royalty payment processing feature
+- `&royaltyBaseFee=0` - Set base fee per location per month (default: $0)
+- `&royaltyPerTx=1.82` - Set per-transaction ACH fee (default: $1.82, includes $0.32 WorldPay fee + $1.50 service fee)
+- `&royaltyTxCount=2` - Set estimated transactions per location per month (default: 2)
 
 ### Example: Full Configuration
 ```html
 <iframe
   src="https://your-url.com?embedded=true&theme=transparent&hideSettings=true&plan=growth&count=25&annual=true"
+  width="100%"
+  height="800"
+></iframe>
+```
+
+### Example: With Custom Discount
+```html
+<iframe
+  src="https://your-url.com?embedded=true&theme=transparent&plan=growth&count=25&annual=true&discountType=percentage&discountValue=15&discountLabel=Early%20Adopter%20Discount"
+  width="100%"
+  height="800"
+></iframe>
+```
+
+### Example: With Royalty Processing
+```html
+<iframe
+  src="https://your-url.com?embedded=true&theme=transparent&plan=growth&count=25&annual=true&royaltyProcessing=true&royaltyPerTx=1.82&royaltyTxCount=2"
   width="100%"
   height="800"
 ></iframe>
@@ -136,6 +161,35 @@ Sent whenever user changes selections (debounced 300ms for sliders).
     resellerCommissionAmount: 0,       // Dollar amount of reseller commission
     wholesaleDiscount: 0,              // Wholesale discount percentage
     resellerCommission: 0,             // Reseller commission percentage
+
+    // NEW: Custom discount (null if no discount applied)
+    customDiscount: {
+      type: 'percentage',              // Discount type: 'percentage' or 'fixed'
+      value: 15,                       // Discount value (15% or $15)
+      label: 'Early Adopter Discount', // Display label
+      reason: 'Q1 2025 promotion',     // Internal notes
+      discountAmount: 250.00           // Calculated dollar discount
+    } | null,
+
+    // NEW: Royalty payment processing (null if not enabled)
+    royaltyProcessing: {
+      enabled: true,                   // Whether royalty processing is enabled
+      baseFee: 0,                      // Monthly base fee per location
+      perTransaction: 1.82,            // Fee per ACH transaction ($0.32 WorldPay + $1.50 service)
+      estimatedTransactions: 2,        // Estimated monthly transactions per location
+      totalFee: 91.00                  // Calculated total royalty processing fee (25 locations × 2 txns × $1.82)
+    } | null,
+
+    // NEW: Detailed price breakdown
+    priceBreakdown: {
+      subtotal: 2000.00,               // Before any discounts
+      volumeDiscount: 0,               // Volume tier discount (baked into subtotal)
+      customDiscount: 250.00,          // Custom discount amount
+      wholesaleDiscount: 0,            // Wholesale discount amount
+      annualSavings: 333.33,           // Annual billing savings
+      royaltyProcessingFee: 91.00,     // Royalty payment processing fee (if enabled)
+      finalMonthlyPrice: 1691.00       // Final price after all discounts + royalty processing
+    },
 
     // Plan features
     planDetails: {

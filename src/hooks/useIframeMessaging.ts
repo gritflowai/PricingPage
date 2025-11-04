@@ -12,6 +12,29 @@ export interface PricingSelectionData {
   resellerCommissionAmount: number;
   wholesaleDiscount: number;
   resellerCommission: number;
+  customDiscount?: {
+    type: 'percentage' | 'fixed';
+    value: number;
+    label: string;
+    reason: string;
+    discountAmount: number;
+  } | null;
+  royaltyProcessing?: {
+    enabled: boolean;
+    baseFee: number;
+    perTransaction: number;
+    estimatedTransactions: number;
+    totalFee: number;
+  } | null;
+  priceBreakdown?: {
+    subtotal: number;
+    volumeDiscount: number;
+    customDiscount: number;
+    wholesaleDiscount: number;
+    annualSavings: number;
+    royaltyProcessingFee?: number;
+    finalMonthlyPrice: number;
+  };
   planDetails: {
     name: string;
     connections: number;
