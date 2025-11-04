@@ -499,7 +499,188 @@ For questions or issues with embedding:
 - Verify URL parameters are correctly formatted
 - Test in incognito mode to rule out browser extensions
 
+## Quote Mode (NEW!)
+
+### Overview
+Quote Mode allows you to generate, lock, and share pricing quotes with customers. Quotes are stored in the database and can be shared via URL.
+
+### URL Parameters for Quote Mode
+- `?mode=quote` - Enable quote mode (required)
+- `&id=<uuid>` - Quote ID (if loading existing quote, optional for new quotes)
+- `&quoteExpiresInDays=30` - Days until quote expires after locking (default: 30)
+- All standard parameters work: `plan`, `count`, `annual`, etc.
+
+### Example: Create New Quote
+```html
+<iframe
+  src="https://your-url.com?mode=quote&plan=growth&count=25&annual=true"
+  width="100%"
+  height="900"
+></iframe>
+```
+
+### Example: Load Existing Quote
+```html
+<iframe
+  src="https://your-url.com?mode=quote&id=550e8400-e29b-41d4-a716-446655440000"
+  width="100%"
+  height="900"
+></iframe>
+```
+
+### New Message Types for Quote Mode
+
+#### QUOTE_ID_READY
+Sent when calculator generates a new quote ID (only if ID not provided in URL).
+
+```javascript
+{
+  type: 'QUOTE_ID_READY',
+  data: {
+    id: '550e8400-e29b-41d4-a716-446655440000'  // Generated UUID
+  }
+}
+```
+
+#### QUOTE_SUMMARY_UPDATE
+Sent when user changes selections in draft mode (debounced 300ms). Similar to `PRICING_SELECTION_UPDATE` but includes quote metadata.
+
+```javascript
+{
+  type: 'QUOTE_SUMMARY_UPDATE',
+  data: {
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    selectedPlan: 'growth',
+    count: 25,
+    isAnnual: true,
+    currency: 'USD',
+    priceBreakdown: { /* full breakdown */ },
+    planDetails: { /* plan features */ },
+    selectionRaw: { /* complete state */ },
+    pricingModelId: 'uuid-of-pricing-model',
+    expiresInDays: 30
+  }
+}
+```
+
+#### QUOTE_LOCKED
+Sent when user locks the quote (freezes pricing for 30 days).
+
+```javascript
+{
+  type: 'QUOTE_LOCKED',
+  data: {
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    version: 2,                              // Incremented on lock
+    expiresAt: '2025-12-31T23:59:59Z',      // Expiration timestamp
+    status: 'locked',
+    pricingModelId: 'uuid-of-pricing-model'
+  }
+}
+```
+
+#### QUOTE_ACCEPT_INTENT
+Sent when user clicks "Accept Quote" button. **Parent should handle click-wrap terms acceptance.**
+
+```javascript
+{
+  type: 'QUOTE_ACCEPT_INTENT',
+  data: {
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    version: 2,
+    pricingModelId: 'uuid-of-pricing-model'
+  }
+}
+```
+
+### Quote Mode Integration Example
+
+```javascript
+// Listen for quote events
+window.addEventListener('message', function(event) {
+  const message = event.data;
+
+  switch(message.type) {
+    case 'QUOTE_ID_READY':
+      // Store the generated quote ID
+      const quoteId = message.data.id;
+      console.log('New quote created:', quoteId);
+
+      // Save to your database or local storage
+      localStorage.setItem('currentQuoteId', quoteId);
+      break;
+
+    case 'QUOTE_SUMMARY_UPDATE':
+      // Quote pricing updated (auto-saved to database)
+      console.log('Quote updated:', message.data);
+
+      // Update your UI if needed
+      document.getElementById('current-quote-price').textContent =
+        '$' + message.data.priceBreakdown.finalMonthlyPrice.toFixed(2);
+      break;
+
+    case 'QUOTE_LOCKED':
+      // Quote has been locked (pricing frozen for 30 days)
+      console.log('Quote locked until:', message.data.expiresAt);
+
+      // Generate shareable URL
+      const shareUrl = `https://your-url.com?mode=quote&id=${message.data.id}`;
+
+      // Show share link to user
+      document.getElementById('share-link').value = shareUrl;
+      document.getElementById('share-section').style.display = 'block';
+      break;
+
+    case 'QUOTE_ACCEPT_INTENT':
+      // User clicked "Accept Quote" - show your terms/click-wrap
+      console.log('User wants to accept quote:', message.data.id);
+
+      // Show your terms modal
+      showTermsModal({
+        quoteId: message.data.id,
+        onAccept: () => {
+          // After user accepts terms, optionally send message back
+          // (or handle acceptance in your own system)
+
+          // Notify your backend
+          fetch('/api/quotes/accept', {
+            method: 'POST',
+            body: JSON.stringify({ quoteId: message.data.id })
+          });
+        }
+      });
+      break;
+  }
+});
+```
+
+### Quote Workflow
+
+1. **Draft**: User configures pricing, auto-saves every 300ms
+2. **Lock**: User clicks "Lock Quote for 30 Days" → pricing frozen, expiration set
+3. **Share**: Copy locked quote URL to share with customer
+4. **Accept**: Customer clicks "Accept Quote" → parent handles terms acceptance
+5. **Expired**: If 30 days pass, quote status becomes "expired"
+
+### Quote Status Visual Indicators
+
+The calculator shows different banners based on quote status:
+- **Draft**: Blue "Quote in Progress - Changes are being saved"
+- **Locked**: Green "Quote Locked - Expires in X days"
+- **Accepted**: Green "✓ Quote Accepted"
+- **Expired**: Red "Quote Expired"
+
+When locked, all controls (sliders, plan selectors, toggles) are disabled.
+
 ## Change Log
+
+### Version 2.0.0 (2025-11-04)
+- **NEW: Quote Mode** - Generate, lock, and share pricing quotes
+- **NEW: Quote database storage** via Supabase
+- **NEW: Quote lifecycle** - Draft → Lock → Accept → Expire
+- **NEW: Quote messages** - `QUOTE_ID_READY`, `QUOTE_SUMMARY_UPDATE`, `QUOTE_LOCKED`, `QUOTE_ACCEPT_INTENT`
+- **NEW: Shareable quote URLs** with 30-day expiration
+- **NEW: Read-only mode** for locked/accepted quotes
 
 ### Version 1.0.0 (2025-10-31)
 - Initial iframe embedding support

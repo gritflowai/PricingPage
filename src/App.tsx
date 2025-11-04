@@ -6,9 +6,13 @@ import ContactModal from './components/ContactModal';
 import Tooltip from './components/Tooltip';
 import RoleSelector from './components/RoleSelector';
 import FeatureComparison from './components/FeatureComparison';
+import { QuoteModeBanner } from './components/QuoteModeBanner';
 import { AlertCircle, ChevronDown, Shield, CreditCard, RefreshCw } from 'lucide-react';
 import { useIframeMessaging } from './hooks/useIframeMessaging';
 import { calculateCustomDiscount, type DiscountType } from './utils/discountCalculator';
+import { useQuoteMode } from './hooks/useQuoteMode';
+import * as quoteApi from './lib/quoteApi';
+import type { QuoteStatus, QuoteSummary } from './types/quote';
 
 // Define plan types
 type PlanType = 'ai-advisor' | 'starter' | 'growth' | 'scale';
@@ -234,6 +238,10 @@ function getEmbedConfig() {
     initialRoyaltyBaseFee: params.has('royaltyBaseFee') ? parseFloat(params.get('royaltyBaseFee')!) : null,
     initialRoyaltyPerTransaction: params.has('royaltyPerTx') ? parseFloat(params.get('royaltyPerTx')!) : null,
     initialEstimatedTransactions: params.has('royaltyTxCount') ? parseInt(params.get('royaltyTxCount')!) : null,
+    // Quote mode parameters
+    mode: params.get('mode') || 'calculator',
+    quoteId: params.get('id') || null,
+    expiresInDays: parseInt(params.get('quoteExpiresInDays') || '30', 10),
   };
 }
 
@@ -361,6 +369,14 @@ function App() {
     embedConfig.initialEstimatedTransactions ?? savedSettings.estimatedTransactions
   );
 
+  // Quote mode state
+  const [quoteMode, setQuoteMode] = useState(embedConfig.mode === 'quote');
+  const [quoteId, setQuoteId] = useState<string | null>(embedConfig.quoteId);
+  const [quoteStatus, setQuoteStatus] = useState<QuoteStatus>('draft');
+  const [quoteExpiresAt, setQuoteExpiresAt] = useState<string | null>(null);
+  const [quoteLockedAt, setQuoteLockedAt] = useState<string | null>(null);
+  const [currentPricingModelId, setCurrentPricingModelId] = useState<string | null>(null);
+
   const currentPlan = planConfigs[selectedPlan];
 
   // Get terminology based on user type
@@ -438,6 +454,61 @@ function App() {
     }
   }, [count, currentPlan.contactThreshold, currentPlan.name, sendEnterpriseInquiry]);
 
+  // Quote mode initialization
+  useEffect(() => {
+    if (!quoteMode) return;
+
+    const initializeQuote = async () => {
+      try {
+        if (quoteId) {
+          // Load existing quote
+          const existingQuote = await quoteApi.getQuote(quoteId);
+
+          // Update state from loaded quote
+          setQuoteStatus(existingQuote.status);
+          setQuoteExpiresAt(existingQuote.expires_at);
+          setQuoteLockedAt(existingQuote.locked_at);
+          setCurrentPricingModelId(existingQuote.pricing_model_id);
+
+          // Set selections from quote
+          if (existingQuote.selected_plan) {
+            setSelectedPlan(existingQuote.selected_plan as PlanType);
+          }
+          if (existingQuote.count) {
+            setCount(existingQuote.count);
+          }
+          if (existingQuote.is_annual !== undefined) {
+            setIsAnnual(existingQuote.is_annual);
+          }
+        } else {
+          // Generate new quote ID
+          const newId = crypto.randomUUID();
+          setQuoteId(newId);
+
+          // Initialize quote with current selections
+          const newQuote = await quoteApi.initQuote({
+            id: newId,
+            selected_plan: selectedPlan,
+            count: count,
+            is_annual: isAnnual,
+          });
+
+          setCurrentPricingModelId(newQuote.pricing_model_id);
+          setQuoteStatus('draft');
+
+          // Emit QUOTE_ID_READY message
+          if (isInIframe && embedConfig.isEmbedded) {
+            window.parent.postMessage({ type: 'QUOTE_ID_READY', data: { id: newId } }, '*');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to initialize quote:', error);
+      }
+    };
+
+    initializeQuote();
+  }, []); // Only run once on mount
+
   // Send selection updates whenever pricing-related state changes
   useEffect(() => {
     if (count < currentPlan.contactThreshold) {
@@ -513,6 +584,111 @@ function App() {
     currentPlan,
     calculatedAiTokens,
     sendSelectionUpdate,
+  ]);
+
+  // Debounced quote updates (only in draft mode)
+  useEffect(() => {
+    if (!quoteMode || quoteStatus !== 'draft' || !quoteId) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const summary: QuoteSummary = {
+          subtotal: totalPrice,
+          final_monthly_price: finalPriceWithRoyalty,
+          price_per_unit: pricePerUnit,
+          annual_savings: monthlySavings,
+          price_breakdown: {
+            subtotal: totalPrice,
+            volumeDiscount: 0,
+            customDiscount: customDiscountAmount,
+            wholesaleDiscount: wholesaleDiscountAmount,
+            annualSavings: monthlySavings,
+            royaltyProcessingFee: royaltyProcessingFee,
+            finalMonthlyPrice: finalPriceWithRoyalty,
+          },
+          plan_details: {
+            name: currentPlan.name,
+            connections: currentPlan.connections,
+            users: selectedPlan === 'ai-advisor' ? count : count * currentPlan.usersPerCompany,
+            scorecards: currentPlan.scorecardsPerCompany === 'unlimited'
+              ? 'unlimited'
+              : (selectedPlan === 'ai-advisor' ? currentPlan.scorecardsPerCompany : currentPlan.scorecardsPerCompany * count),
+            aiTokens: calculatedAiTokens,
+          },
+          selection_raw: {
+            selectedPlan,
+            count,
+            isAnnual,
+            customDiscount: customDiscountAmount > 0 && customDiscountType ? {
+              type: customDiscountType,
+              value: customDiscountValue,
+              label: customDiscountLabel,
+              reason: customDiscountReason,
+              discountAmount: customDiscountAmount,
+            } : null,
+            royaltyProcessing: royaltyProcessingEnabled ? {
+              enabled: true,
+              baseFee: royaltyBaseFee,
+              perTransaction: royaltyPerTransaction,
+              estimatedTransactions: estimatedTransactions,
+              totalFee: royaltyProcessingFee,
+            } : null,
+          },
+        };
+
+        await quoteApi.updateQuote(quoteId, summary);
+
+        // Emit QUOTE_SUMMARY_UPDATE message
+        if (isInIframe && embedConfig.isEmbedded) {
+          window.parent.postMessage({
+            type: 'QUOTE_SUMMARY_UPDATE',
+            data: {
+              id: quoteId,
+              selectedPlan,
+              count,
+              isAnnual,
+              currency: 'USD',
+              priceBreakdown: summary.price_breakdown,
+              planDetails: summary.plan_details,
+              selectionRaw: summary.selection_raw,
+              pricingModelId: currentPricingModelId,
+              expiresInDays: embedConfig.expiresInDays,
+            },
+          }, '*');
+        }
+      } catch (error) {
+        console.error('Failed to update quote:', error);
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timer);
+  }, [
+    quoteMode,
+    quoteStatus,
+    quoteId,
+    selectedPlan,
+    count,
+    isAnnual,
+    totalPrice,
+    finalPriceWithRoyalty,
+    pricePerUnit,
+    monthlySavings,
+    customDiscountAmount,
+    wholesaleDiscountAmount,
+    royaltyProcessingFee,
+    currentPlan,
+    calculatedAiTokens,
+    customDiscountType,
+    customDiscountValue,
+    customDiscountLabel,
+    customDiscountReason,
+    royaltyProcessingEnabled,
+    royaltyBaseFee,
+    royaltyPerTransaction,
+    estimatedTransactions,
+    currentPricingModelId,
+    isInIframe,
+    embedConfig,
   ]);
 
   const formatNumber = (num: number) => {
@@ -628,6 +804,54 @@ function App() {
     }
   };
 
+  // Quote mode handlers
+  const handleLockQuote = async () => {
+    if (!quoteId) return;
+
+    try {
+      const lockedQuote = await quoteApi.lockQuote(quoteId, embedConfig.expiresInDays);
+      setQuoteStatus('locked');
+      setQuoteExpiresAt(lockedQuote.expires_at);
+      setQuoteLockedAt(lockedQuote.locked_at);
+
+      // Emit QUOTE_LOCKED message
+      if (isInIframe && embedConfig.isEmbedded) {
+        window.parent.postMessage({
+          type: 'QUOTE_LOCKED',
+          data: {
+            id: quoteId,
+            version: lockedQuote.version,
+            expiresAt: lockedQuote.expires_at,
+            status: 'locked',
+            pricingModelId: currentPricingModelId,
+          },
+        }, '*');
+      }
+    } catch (error) {
+      console.error('Failed to lock quote:', error);
+      alert('Failed to lock quote. Please try again.');
+    }
+  };
+
+  const handleAcceptQuote = () => {
+    if (!quoteId) return;
+
+    // Emit QUOTE_ACCEPT_INTENT message (parent handles click-wrap)
+    if (isInIframe && embedConfig.isEmbedded) {
+      window.parent.postMessage({
+        type: 'QUOTE_ACCEPT_INTENT',
+        data: {
+          id: quoteId,
+          version: 2, // Locked quotes have version 2
+          pricingModelId: currentPricingModelId,
+        },
+      }, '*');
+    }
+  };
+
+  // Determine if controls should be disabled (locked, accepted, or expired)
+  const isLocked = quoteMode && (quoteStatus === 'locked' || quoteStatus === 'accepted' || quoteStatus === 'expired');
+
   // Determine background color based on theme
   const backgroundColor = embedConfig.theme === 'transparent'
     ? 'transparent'
@@ -649,37 +873,49 @@ function App() {
 
       <div className={outerPadding}>
         <div className={`max-w-6xl mx-auto ${bottomMargin} ${topMargin}`}>
+        {/* Quote Mode Banner */}
+        {quoteMode && (
+          <QuoteModeBanner
+            status={quoteStatus}
+            expiresAt={quoteExpiresAt}
+            lockedAt={quoteLockedAt}
+          />
+        )}
+
         <div className="bg-white rounded-lg shadow-sm border border-[#1239FF]/10 p-1 overflow-visible relative">
           <div className="flex flex-col md:flex-row gap-2">
             <button
               onClick={() => setSelectedPlan('ai-advisor')}
+              disabled={isLocked}
               className={`flex-1 px-4 py-3 rounded-md smooth-transition ${
                 selectedPlan === 'ai-advisor'
                   ? 'bg-[#1239FF] text-white shadow-md'
                   : 'bg-transparent text-[#180D43] hover:bg-gray-50'
-              }`}
+              } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div className="font-bold text-sm sm:text-base md:text-lg">AI Growth Advisor</div>
               <div className="text-[11px] sm:text-xs md:text-sm mt-1 opacity-80">$19/user • 0 connections</div>
             </button>
             <button
               onClick={() => setSelectedPlan('starter')}
+              disabled={isLocked}
               className={`flex-1 px-4 py-3 rounded-md smooth-transition ${
                 selectedPlan === 'starter'
                   ? 'bg-[#1239FF] text-white shadow-md'
                   : 'bg-transparent text-[#180D43] hover:bg-gray-50'
-              }`}
+              } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div className="font-bold text-sm sm:text-base md:text-lg">Starter</div>
               <div className="text-[11px] sm:text-xs md:text-sm mt-1 opacity-80">1 connection • From $90</div>
             </button>
             <button
               onClick={() => setSelectedPlan('growth')}
+              disabled={isLocked}
               className={`flex-1 px-4 py-3 rounded-md smooth-transition relative ${
                 selectedPlan === 'growth'
                   ? 'bg-[#1239FF] text-white shadow-md'
                   : 'bg-transparent text-[#180D43] hover:bg-gray-50'
-              }`}
+              } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               {/* Most Popular Badge */}
               <div className="absolute -top-2.5 md:-top-3 left-1/2 -translate-x-1/2 z-10">
@@ -692,11 +928,12 @@ function App() {
             </button>
             <button
               onClick={() => setSelectedPlan('scale')}
+              disabled={isLocked}
               className={`flex-1 px-4 py-3 rounded-md smooth-transition ${
                 selectedPlan === 'scale'
                   ? 'bg-[#1239FF] text-white shadow-md'
                   : 'bg-transparent text-[#180D43] hover:bg-gray-50'
-              }`}
+              } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div className="font-bold text-sm sm:text-base md:text-lg">Scale</div>
               <div className="text-[11px] sm:text-xs md:text-sm mt-1 opacity-80">5 connections • From $150</div>
@@ -715,7 +952,7 @@ function App() {
         </div>
       </div>
 
-      <PricingToggle isAnnual={isAnnual} setIsAnnual={setIsAnnual} monthlySavings={monthlySavings} isEmbedded={embedConfig.isEmbedded} />
+      <PricingToggle isAnnual={isAnnual} setIsAnnual={setIsAnnual} monthlySavings={monthlySavings} isEmbedded={embedConfig.isEmbedded} disabled={isLocked} />
 
       <div className="max-w-4xl mx-auto">
         <div className={`grid md:grid-cols-2 ${gridGap}`}>
@@ -735,6 +972,7 @@ function App() {
                   setIsEnterpriseRequest(false);
                   setShowContactModal(true);
                 }}
+                disabled={isLocked}
               />
 
               {/* Volume Discount Indicator */}
@@ -835,53 +1073,113 @@ function App() {
                 )}
               </div>
 
-              {/* CTA Button moved higher */}
+              {/* CTA Button - Quote Mode or Calculator Mode */}
               <div className="mb-4">
-                <button
-                  onClick={() => {
-                    sendUserAction('START_FREE_TRIAL', {
-                      selectedPlan,
-                      count,
-                      isAnnual,
-                      finalPrice: finalPriceWithRoyalty,
-                      pricePerUnit,
-                      totalPrice,
-                      monthlySavings,
-                      wholesaleDiscountAmount,
-                      resellerCommissionAmount,
-                      wholesaleDiscount,
-                      resellerCommission,
-                      planDetails: {
-                        name: currentPlan.name,
-                        connections: currentPlan.connections,
-                        users: selectedPlan === 'ai-advisor' ? count : count * currentPlan.usersPerCompany,
-                        scorecards: currentPlan.scorecardsPerCompany === 'unlimited'
-                          ? 'unlimited'
-                          : (selectedPlan === 'ai-advisor' ? currentPlan.scorecardsPerCompany : currentPlan.scorecardsPerCompany * count),
-                        aiTokens: calculatedAiTokens,
-                      },
-                    });
-                  }}
-                  className="w-full bg-[#1239FF] text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-[#1239FF]/90 smooth-transition transform hover:scale-[1.02] glow-blue hover:glow-blue-strong"
-                >
-                  Start Your Free Trial
-                </button>
+                {quoteMode ? (
+                  // Quote Mode Buttons
+                  <>
+                    {quoteStatus === 'draft' && (
+                      <button
+                        onClick={handleLockQuote}
+                        className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-blue-700 smooth-transition transform hover:scale-[1.02]"
+                      >
+                        Lock Quote for {embedConfig.expiresInDays} Days
+                      </button>
+                    )}
 
-                {/* Trust Indicators */}
-                <div className="flex justify-center gap-4 mt-3 text-xs text-[#180D43]/60">
-                  <span className="flex items-center gap-1">
-                    <CreditCard className="w-3 h-3" />
-                    No credit card required
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <RefreshCw className="w-3 h-3" />
-                    Cancel anytime
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Shield className="w-3 h-3" />
-                    7-day free trial
-                  </span>
-                </div>
+                    {quoteStatus === 'locked' && (
+                      <>
+                        <button
+                          onClick={handleAcceptQuote}
+                          className="w-full bg-green-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-green-700 smooth-transition transform hover:scale-[1.02]"
+                        >
+                          Accept Quote
+                        </button>
+
+                        {/* Secondary Actions for Locked Quote */}
+                        <div className="mt-3 flex gap-3">
+                          <button
+                            onClick={() => {
+                              const url = `${window.location.origin}${window.location.pathname}?mode=quote&id=${quoteId}`;
+                              navigator.clipboard.writeText(url);
+                              alert('Quote URL copied to clipboard!');
+                            }}
+                            className="flex-1 border border-gray-300 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                          >
+                            📋 Copy Quote Link
+                          </button>
+                          <button
+                            onClick={() => setShowPricingDetails(!showPricingDetails)}
+                            className="flex-1 border border-gray-300 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                          >
+                            📊 View Details
+                          </button>
+                        </div>
+                      </>
+                    )}
+
+                    {quoteStatus === 'accepted' && (
+                      <div className="w-full bg-green-50 border-2 border-green-500 px-6 py-3 rounded-lg text-lg font-semibold text-green-800 text-center">
+                        ✓ Quote Accepted
+                      </div>
+                    )}
+
+                    {quoteStatus === 'expired' && (
+                      <div className="w-full bg-red-50 border-2 border-red-500 px-6 py-3 rounded-lg text-lg font-semibold text-red-800 text-center">
+                        Quote Expired
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  // Calculator Mode Button
+                  <>
+                    <button
+                      onClick={() => {
+                        sendUserAction('START_FREE_TRIAL', {
+                          selectedPlan,
+                          count,
+                          isAnnual,
+                          finalPrice: finalPriceWithRoyalty,
+                          pricePerUnit,
+                          totalPrice,
+                          monthlySavings,
+                          wholesaleDiscountAmount,
+                          resellerCommissionAmount,
+                          wholesaleDiscount,
+                          resellerCommission,
+                          planDetails: {
+                            name: currentPlan.name,
+                            connections: currentPlan.connections,
+                            users: selectedPlan === 'ai-advisor' ? count : count * currentPlan.usersPerCompany,
+                            scorecards: currentPlan.scorecardsPerCompany === 'unlimited'
+                              ? 'unlimited'
+                              : (selectedPlan === 'ai-advisor' ? currentPlan.scorecardsPerCompany : currentPlan.scorecardsPerCompany * count),
+                            aiTokens: calculatedAiTokens,
+                          },
+                        });
+                      }}
+                      className="w-full bg-[#1239FF] text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-[#1239FF]/90 smooth-transition transform hover:scale-[1.02] glow-blue hover:glow-blue-strong"
+                    >
+                      Start Your Free Trial
+                    </button>
+
+                    {/* Trust Indicators - Only in Calculator Mode */}
+                    <div className="flex justify-center gap-4 mt-3 text-xs text-[#180D43]/60">
+                      <span className="flex items-center gap-1">
+                        <CreditCard className="w-3 h-3" />
+                        No credit card required
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <RefreshCw className="w-3 h-3" />
+                        Cancel anytime
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Shield className="w-3 h-3" />
+                        7-day free trial
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Collapsible Pricing Details */}

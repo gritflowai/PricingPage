@@ -1,0 +1,80 @@
+// API client for Quote Mode - wraps all Supabase function calls
+
+import type {
+  Quote,
+  PricingModel,
+  InitQuoteRequest,
+  UpdateQuoteRequest,
+  LockQuoteRequest,
+  CreatePricingModelRequest,
+  QuoteSummary,
+} from '../types/quote'
+
+const API_BASE_URL = 'https://ijlpiwxodfsjmexktcoc.supabase.co/functions/v1'
+
+// Helper function for fetch with error handling
+async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.error || `API error: ${response.status}`)
+  }
+
+  return data as T
+}
+
+// Pricing Models API
+
+export async function getActivePricingModel(): Promise<PricingModel> {
+  return apiFetch<PricingModel>('/pricing-models/active')
+}
+
+export async function createPricingModel(
+  request: CreatePricingModelRequest
+): Promise<PricingModel> {
+  return apiFetch<PricingModel>('/pricing-models', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
+}
+
+// Quotes API
+
+export async function initQuote(request: InitQuoteRequest): Promise<Quote> {
+  return apiFetch<Quote>('/quotes/init', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
+}
+
+export async function updateQuote(
+  id: string,
+  summary: QuoteSummary
+): Promise<Quote> {
+  return apiFetch<Quote>('/quotes/update', {
+    method: 'POST',
+    body: JSON.stringify({ id, summary }),
+  })
+}
+
+export async function lockQuote(
+  id: string,
+  expiresInDays: number = 30
+): Promise<Quote> {
+  return apiFetch<Quote>('/quotes/lock', {
+    method: 'POST',
+    body: JSON.stringify({ id, expires_in_days: expiresInDays }),
+  })
+}
+
+export async function getQuote(id: string): Promise<Quote> {
+  return apiFetch<Quote>(`/quotes/${id}`)
+}

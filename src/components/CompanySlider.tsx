@@ -17,6 +17,7 @@ interface CompanySliderProps {
   label: string;
   contactThreshold?: number;
   onExceedThreshold?: () => void;
+  disabled?: boolean;
 }
 
 const CompanySlider: React.FC<CompanySliderProps> = ({
@@ -27,7 +28,8 @@ const CompanySlider: React.FC<CompanySliderProps> = ({
   pricingTiers,
   label,
   contactThreshold,
-  onExceedThreshold
+  onExceedThreshold,
+  disabled = false,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(companies.toString());
@@ -147,7 +149,10 @@ const CompanySlider: React.FC<CompanySliderProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={handleDecrement}
-            className="w-10 h-10 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 smooth-transition hover:scale-110"
+            disabled={disabled}
+            className={`w-10 h-10 flex items-center justify-center bg-gray-100 rounded-full smooth-transition ${
+              disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200 hover:scale-110'
+            }`}
           >
             <Minus className="w-5 h-5 text-gray-600" />
           </button>
@@ -158,7 +163,10 @@ const CompanySlider: React.FC<CompanySliderProps> = ({
             value={companies}
             onChange={handleSliderChange}
             onKeyDown={handleKeyDown}
-            className={`flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider-gradient ${tierCrossing ? 'pulse-glow' : ''}`}
+            disabled={disabled}
+            className={`flex-1 h-2 bg-gray-200 rounded-lg appearance-none slider-gradient ${
+              tierCrossing ? 'pulse-glow' : ''
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             style={{ '--slider-percent': `${sliderPercent}%` } as React.CSSProperties}
             aria-label={`Select number of ${unitLabel}s`}
             aria-valuemin={minCompanies}
@@ -167,7 +175,10 @@ const CompanySlider: React.FC<CompanySliderProps> = ({
           />
           <button
             onClick={handleIncrement}
-            className="w-10 h-10 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 smooth-transition hover:scale-110"
+            disabled={disabled}
+            className={`w-10 h-10 flex items-center justify-center bg-gray-100 rounded-full smooth-transition ${
+              disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200 hover:scale-110'
+            }`}
           >
             <Plus className="w-5 h-5 text-gray-600" />
           </button>
