@@ -222,6 +222,17 @@ const FeatureComparison: React.FC<FeatureComparisonProps> = ({ selectedPlan }) =
             'scale': true,
             'enterprise': true
           }
+        },
+        {
+          name: 'Royalty Processing (Optional)',
+          tooltip: 'Optional automated ACH royalty collection. Included with plan - you only pay ACH transaction fees (~$1.82/transaction)',
+          values: {
+            'ai-advisor': false,
+            'starter': true,
+            'growth': true,
+            'scale': true,
+            'enterprise': true
+          }
         }
       ]
     }

@@ -377,6 +377,9 @@ function App() {
   const [quoteLockedAt, setQuoteLockedAt] = useState<string | null>(null);
   const [currentPricingModelId, setCurrentPricingModelId] = useState<string | null>(null);
 
+  // UI state for optional features section
+  const [showOptionalFeatures, setShowOptionalFeatures] = useState(false);
+
   const currentPlan = planConfigs[selectedPlan];
 
   // Get terminology based on user type
@@ -849,6 +852,22 @@ function App() {
     }
   };
 
+  // Copy share link to clipboard
+  const handleCopyShareLink = async () => {
+    if (!quoteId) return;
+
+    const baseUrl = window.location.origin + window.location.pathname;
+    const shareUrl = `${baseUrl}?mode=quote&id=${quoteId}`;
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      alert('Quote link copied to clipboard!');
+    } catch (err) {
+      console.error('Failed to copy:', err);
+      alert('Failed to copy link. Please try again.');
+    }
+  };
+
   // Determine if controls should be disabled (locked, accepted, or expired)
   const isLocked = quoteMode && (quoteStatus === 'locked' || quoteStatus === 'accepted' || quoteStatus === 'expired');
 
@@ -1099,11 +1118,7 @@ function App() {
                         {/* Secondary Actions for Locked Quote */}
                         <div className="mt-3 flex gap-3">
                           <button
-                            onClick={() => {
-                              const url = `${window.location.origin}${window.location.pathname}?mode=quote&id=${quoteId}`;
-                              navigator.clipboard.writeText(url);
-                              alert('Quote URL copied to clipboard!');
-                            }}
+                            onClick={handleCopyShareLink}
                             className="flex-1 border border-gray-300 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors"
                           >
                             📋 Copy Quote Link
@@ -1182,6 +1197,67 @@ function App() {
                 )}
               </div>
 
+              {/* Optional Features Section */}
+              {selectedPlan !== 'ai-advisor' && !quoteMode && (
+                <div className="border-t border-gray-200 pt-3 mt-3">
+                  <button
+                    onClick={() => setShowOptionalFeatures(!showOptionalFeatures)}
+                    className="flex items-center justify-between w-full text-sm text-gray-700 hover:text-gray-900 font-medium py-2"
+                  >
+                    <span>Optional Features</span>
+                    <ChevronDown className={`w-4 h-4 transition-transform ${showOptionalFeatures ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showOptionalFeatures && (
+                    <div className="mt-3 space-y-3">
+                      {/* Royalty Processing Toggle */}
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={royaltyProcessingEnabled}
+                            onChange={(e) => setRoyaltyProcessingEnabled(e.target.checked)}
+                            disabled={isLocked}
+                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-sm font-medium text-gray-900">
+                            Royalty Processing
+                          </span>
+                        </label>
+
+                        <p className="text-xs text-gray-600 mt-1 ml-6">
+                          Included with plan - pay only ACH fees ($1.82/transaction)
+                        </p>
+
+                        {royaltyProcessingEnabled && (
+                          <div className="mt-3 ml-6">
+                            <label className="block text-xs text-gray-700 mb-1">
+                              Est. transactions per {terminology.singular} per month:
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={estimatedTransactions}
+                              onChange={(e) => setEstimatedTransactions(parseInt(e.target.value) || 0)}
+                              disabled={isLocked}
+                              className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+
+                            {estimatedTransactions > 0 && (
+                              <p className="text-xs text-gray-600 mt-2">
+                                Cost: ${(royaltyPerTransaction * estimatedTransactions * count).toFixed(2)}/mo
+                                <br />
+                                ({estimatedTransactions} txns × {count} {terminology.plural} × ${royaltyPerTransaction})
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Collapsible Pricing Details */}
               <div className="border-t border-gray-200 pt-3">
                 <button
@@ -1197,18 +1273,10 @@ function App() {
                     <div className="space-y-2">
                       <div className="border-b border-gray-200 pb-2">
                         <div className="font-medium text-sm md:text-base">{selectedPlan === 'ai-advisor' ? 'Users' : terminology.capitalized} ({count}):</div>
-                        {basePrice.perUnit > 0 && (
-                          <div className="flex justify-between text-[#180D43]/70 text-xs md:text-sm">
-                            <span className="truncate mr-2">{count} × ${formatNumber(basePrice.perUnit / count)}/unit</span>
-                            <span className="whitespace-nowrap">${formatNumber(basePrice.perUnit)}/mo</span>
-                          </div>
-                        )}
-                        {basePrice.flatFee > 0 && (
-                          <div className="flex justify-between text-[#180D43]/70 text-xs md:text-sm">
-                            <span>Flat monthly fee</span>
-                            <span className="whitespace-nowrap">${formatNumber(basePrice.flatFee)}/mo</span>
-                          </div>
-                        )}
+                        <div className="flex justify-between text-[#180D43]/70 text-xs md:text-sm">
+                          <span className="truncate mr-2">${formatNumber(basePrice.total / count)} each</span>
+                          <span className="whitespace-nowrap">${formatNumber(basePrice.total)}/mo</span>
+                        </div>
                         <div className="flex justify-between font-medium mt-1 text-xs md:text-sm">
                           <span>Subtotal:</span>
                           <span className="whitespace-nowrap">${formatNumber(basePrice.total)}/mo</span>
@@ -1404,7 +1472,7 @@ function App() {
       {/* Feature Comparison Table */}
       <FeatureComparison selectedPlan={selectedPlan} />
 
-      {!embedConfig.hideSettings && (
+      {(!embedConfig.hideSettings || quoteMode) && (
         <Settings
           planConfigs={planConfigs}
           wholesaleDiscount={wholesaleDiscount}
