@@ -21,7 +21,13 @@ import { DEFAULT_PLAN_CONFIGS, type PlanType, type PlanConfig, type PricingTier 
 type UserType = 'cpa' | 'franchisee' | 'smb';
 
 function calculateBasePrice(count: number, pricingTiers: PricingTier[]): { total: number; perUnit: number; flatFee: number } {
-  const tier = pricingTiers.find(t => count >= t.firstUnit && count <= t.lastUnit);
+  let tier = pricingTiers.find(t => count >= t.firstUnit && count <= t.lastUnit);
+
+  // If no tier found (count exceeds all tiers), use the last tier
+  if (!tier && pricingTiers.length > 0) {
+    tier = pricingTiers[pricingTiers.length - 1];
+  }
+
   if (!tier) return { total: 0, perUnit: 0, flatFee: 0 };
 
   if (tier.perUnit === 0) {
@@ -1119,7 +1125,7 @@ function App() {
                 setCompanies={setCount}
                 pricingTiers={currentPlan.pricingTiers}
                 label={selectedPlan === 'ai-advisor' ? "Select Number of Users" : `Select Number of ${terminology.capitalized}`}
-                maxCompanies={adminMode ? 500 : currentPlan.contactThreshold}
+                maxCompanies={currentPlan.contactThreshold}
                 contactThreshold={currentPlan.contactThreshold}
                 onExceedThreshold={() => {
                   if (!adminMode) {
