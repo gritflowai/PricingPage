@@ -97,35 +97,51 @@ export interface IncomingMessage {
 interface UseIframeMessagingOptions {
   enabled?: boolean;
   debounceMs?: number;
+  isEmbedded?: boolean;
 }
 
 export const useIframeMessaging = (options: UseIframeMessagingOptions = {}) => {
-  const { enabled = true, debounceMs = 300 } = options;
+  const { enabled = true, debounceMs = 300, isEmbedded = false } = options;
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isInIframeRef = useRef<boolean>(false);
   const [incomingMessage, setIncomingMessage] = useState<IncomingMessage | null>(null);
 
   // Detect if running in iframe
   useEffect(() => {
-    try {
-      isInIframeRef.current = window.self !== window.top;
-    } catch (e) {
-      // If we can't access window.top due to cross-origin, we're definitely in an iframe
-      isInIframeRef.current = true;
+    let detectedInIframe = false;
+    let detectionMethod = 'unknown';
+
+    // Priority 1: Use explicit isEmbedded parameter from URL (most reliable)
+    if (isEmbedded) {
+      detectedInIframe = true;
+      detectionMethod = 'url-parameter';
+    } else {
+      // Priority 2: Fallback to window comparison (less reliable)
+      try {
+        detectedInIframe = window.self !== window.top;
+        detectionMethod = 'window-comparison';
+      } catch (e) {
+        // If we can't access window.top due to cross-origin, we're definitely in an iframe
+        detectedInIframe = true;
+        detectionMethod = 'cross-origin-error';
+      }
     }
 
-    const isInIframe = isInIframeRef.current;
+    isInIframeRef.current = detectedInIframe;
+
     console.log('[PricingCalculator] Iframe detection:', {
-      isInIframe,
+      isInIframe: detectedInIframe,
+      detectionMethod,
+      isEmbeddedParam: isEmbedded,
       enabled,
       timestamp: new Date().toISOString()
     });
 
     // Send ready message when component mounts
-    if (isInIframe && enabled) {
+    if (detectedInIframe && enabled) {
       sendMessage({ type: 'IFRAME_READY' });
     }
-  }, [enabled]);
+  }, [enabled, isEmbedded]);
 
   const sendMessage = useCallback((message: IframeMessage) => {
     if (!enabled || !isInIframeRef.current) {

@@ -308,7 +308,10 @@ function App() {
     sendQuoteMessage,
     sendQuoteError,
     incomingMessage,
-  } = useIframeMessaging({ enabled: embedConfig.isEmbedded });
+  } = useIframeMessaging({
+    enabled: embedConfig.isEmbedded,
+    isEmbedded: embedConfig.isEmbedded
+  });
 
   // Calculate all pricing values BEFORE useEffect hooks that reference them
   const basePrice = calculateBasePrice(count, currentPlan.pricingTiers);
@@ -885,9 +888,17 @@ function App() {
   const handleAcceptQuote = () => {
     if (!quoteId) return;
 
+    console.log('[PricingCalculator] Accept Quote clicked:', {
+      quoteId,
+      isInIframe,
+      isEmbedded: embedConfig.isEmbedded,
+      timestamp: new Date().toISOString()
+    });
+
     // Check if we're in an iframe (embedded mode)
     if (isInIframe) {
       // Embedded mode: Emit QUOTE_ACCEPT_INTENT message (parent handles click-wrap)
+      console.log('[PricingCalculator] Embedded mode: Sending QUOTE_ACCEPT_INTENT message');
       sendQuoteMessage('QUOTE_ACCEPT_INTENT', {
         id: quoteId,
         version: 2, // Locked quotes have version 2
@@ -896,6 +907,7 @@ function App() {
       });
     } else {
       // Standalone mode: Show click-wrap modal
+      console.log('[PricingCalculator] Standalone mode: Opening ClickWrap modal');
       setShowClickWrapModal(true);
     }
   };
