@@ -18,6 +18,8 @@ async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> 
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
       ...options?.headers,
     },
   })

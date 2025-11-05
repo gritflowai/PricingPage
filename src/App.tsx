@@ -13,150 +13,10 @@ import { calculateCustomDiscount, type DiscountType } from './utils/discountCalc
 import { useQuoteMode } from './hooks/useQuoteMode';
 import * as quoteApi from './lib/quoteApi';
 import type { QuoteStatus, QuoteSummary } from './types/quote';
-
-// Define plan types
-type PlanType = 'ai-advisor' | 'starter' | 'growth' | 'scale';
+import { DEFAULT_PLAN_CONFIGS, type PlanType, type PlanConfig, type PricingTier } from './config/planConfigs';
 
 // Define user types for role selection
 type UserType = 'cpa' | 'franchisee' | 'smb';
-
-interface PricingTier {
-  firstUnit: number;
-  lastUnit: number;
-  perUnit: number;
-  flatFee: number;
-}
-
-interface PlanConfig {
-  name: string;
-  pricingTiers: PricingTier[];
-  connections: number;
-  usersPerCompany: number;
-  scorecardsPerCompany: number | 'unlimited';
-  metricsPerScorecard: number;
-  aiTokensPerDollar: number;
-  historicDataYears: number;
-  contactThreshold: number;
-  stripeProductId: string;
-  features: {
-    dailySync: boolean;
-    immediateSyncCommand: boolean;
-    billingFlexibility: boolean;
-    customBranding: boolean;
-  };
-}
-
-// AI Advisor pricing tiers (volume discounts for users)
-const AI_PRICING_TIER: PricingTier[] = [
-  { firstUnit: 1, lastUnit: 5, perUnit: 19, flatFee: 0 },
-  { firstUnit: 6, lastUnit: 14, perUnit: 17, flatFee: 0 },
-  { firstUnit: 15, lastUnit: 29, perUnit: 15, flatFee: 0 },
-  { firstUnit: 30, lastUnit: 49, perUnit: 12, flatFee: 0 },
-  { firstUnit: 50, lastUnit: 999, perUnit: 10, flatFee: 0 }
-];
-
-// Starter plan pricing tiers
-const STARTER_PRICING_TIERS: PricingTier[] = [
-  { firstUnit: 1, lastUnit: 5, perUnit: 90, flatFee: 0 },
-  { firstUnit: 6, lastUnit: 15, perUnit: 50, flatFee: 200 },
-  { firstUnit: 16, lastUnit: 30, perUnit: 35, flatFee: 425 },
-  { firstUnit: 31, lastUnit: 50, perUnit: 25, flatFee: 725 },
-  { firstUnit: 51, lastUnit: 999, perUnit: 20, flatFee: 975 }
-];
-
-// Growth plan pricing tiers
-const GROWTH_PRICING_TIERS: PricingTier[] = [
-  { firstUnit: 1, lastUnit: 5, perUnit: 180, flatFee: 0 },
-  { firstUnit: 6, lastUnit: 15, perUnit: 100, flatFee: 400 },
-  { firstUnit: 16, lastUnit: 30, perUnit: 65, flatFee: 925 },
-  { firstUnit: 31, lastUnit: 50, perUnit: 55, flatFee: 1225 },
-  { firstUnit: 51, lastUnit: 999, perUnit: 50, flatFee: 1475 }
-];
-
-// Scale plan pricing tiers
-const SCALE_PRICING_TIERS: PricingTier[] = [
-  { firstUnit: 1, lastUnit: 5, perUnit: 350, flatFee: 0 },
-  { firstUnit: 6, lastUnit: 15, perUnit: 200, flatFee: 750 },
-  { firstUnit: 16, lastUnit: 30, perUnit: 125, flatFee: 1875 },
-  { firstUnit: 31, lastUnit: 50, perUnit: 100, flatFee: 2625 },
-  { firstUnit: 51, lastUnit: 999, perUnit: 85, flatFee: 3375 }
-];
-
-// Default plan configurations (synced with Stripe metadata)
-export const DEFAULT_PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
-  'ai-advisor': {
-    name: 'AI Growth Advisor',
-    pricingTiers: AI_PRICING_TIER,
-    connections: 0,
-    usersPerCompany: 1,
-    scorecardsPerCompany: 'unlimited',
-    metricsPerScorecard: 999,
-    aiTokensPerDollar: 166666,
-    historicDataYears: 0,
-    contactThreshold: 50,
-    stripeProductId: 'prod_7YtGm3ZhA2kR1Q5B',
-    features: {
-      dailySync: false,
-      immediateSyncCommand: false,
-      billingFlexibility: false,
-      customBranding: false
-    }
-  },
-  'starter': {
-    name: 'Starter',
-    pricingTiers: STARTER_PRICING_TIERS,
-    connections: 1,
-    usersPerCompany: 3,
-    scorecardsPerCompany: 12,
-    metricsPerScorecard: 10,
-    aiTokensPerDollar: 166666,
-    historicDataYears: 2,
-    contactThreshold: 50,
-    stripeProductId: 'prod_9WlNx5UpL8dC4V6M',
-    features: {
-      dailySync: true,
-      immediateSyncCommand: false,
-      billingFlexibility: false,
-      customBranding: false
-    }
-  },
-  'growth': {
-    name: 'Growth',
-    pricingTiers: GROWTH_PRICING_TIERS,
-    connections: 3,
-    usersPerCompany: 5,
-    scorecardsPerCompany: 25,
-    metricsPerScorecard: 15,
-    aiTokensPerDollar: 166666,
-    historicDataYears: 3,
-    contactThreshold: 50,
-    stripeProductId: 'prod_3QpHz8EvN1sB7K2X',
-    features: {
-      dailySync: true,
-      immediateSyncCommand: true,
-      billingFlexibility: true,
-      customBranding: true
-    }
-  },
-  'scale': {
-    name: 'Scale',
-    pricingTiers: SCALE_PRICING_TIERS,
-    connections: 5,
-    usersPerCompany: 8,
-    scorecardsPerCompany: 25,
-    metricsPerScorecard: 15,
-    aiTokensPerDollar: 166666,
-    historicDataYears: 4,
-    contactThreshold: 50,
-    stripeProductId: 'prod_6RtKx2JmF4aL9D7T',
-    features: {
-      dailySync: true,
-      immediateSyncCommand: true,
-      billingFlexibility: true,
-      customBranding: true
-    }
-  }
-};
 
 function calculateBasePrice(count: number, pricingTiers: PricingTier[]): { total: number; perUnit: number; flatFee: number } {
   const tier = pricingTiers.find(t => count >= t.firstUnit && count <= t.lastUnit);
@@ -228,6 +88,7 @@ function getEmbedConfig() {
     isEmbedded: params.get('embedded') === 'true',
     theme: params.get('theme') || 'default',
     hideSettings: params.get('hideSettings') === 'true',
+    adminMode: params.get('admin') === 'true',
     initialPlan: params.get('plan') as PlanType | null,
     initialCount: params.has('count') ? parseInt(params.get('count')!, 10) : null,
     initialIsAnnual: params.has('annual') ? params.get('annual') === 'true' : null,
@@ -238,10 +99,13 @@ function getEmbedConfig() {
     initialRoyaltyBaseFee: params.has('royaltyBaseFee') ? parseFloat(params.get('royaltyBaseFee')!) : null,
     initialRoyaltyPerTransaction: params.has('royaltyPerTx') ? parseFloat(params.get('royaltyPerTx')!) : null,
     initialEstimatedTransactions: params.has('royaltyTxCount') ? parseInt(params.get('royaltyTxCount')!) : null,
+    initialOnboardingFeeAmount: params.has('onboardingFee') ? parseFloat(params.get('onboardingFee')!) : null,
+    initialOnboardingFeeTitle: params.get('onboardingTitle') || null,
+    initialOnboardingFeeDescription: params.get('onboardingDesc') || null,
     // Quote mode parameters
     mode: params.get('mode') || 'calculator',
     quoteId: params.get('id') || null,
-    expiresInDays: parseInt(params.get('quoteExpiresInDays') || '30', 10),
+    expiresInDays: parseInt(params.get('quoteExpiresInDays') || '14', 10),
   };
 }
 
@@ -258,6 +122,11 @@ function loadSavedSettings(): {
   royaltyBaseFee: number;
   royaltyPerTransaction: number;
   estimatedTransactions: number;
+  onboardingFeeAmount: number;
+  onboardingFeeTitle: string;
+  onboardingFeeDescription: string;
+  quoteStartDate: string;
+  quoteExpirationDays: number;
 } {
   try {
     const saved = localStorage.getItem('pricingSettings');
@@ -288,7 +157,12 @@ function loadSavedSettings(): {
         royaltyProcessingEnabled: parsed.royaltyProcessingEnabled || false,
         royaltyBaseFee: parsed.royaltyBaseFee !== undefined ? parsed.royaltyBaseFee : 0,
         royaltyPerTransaction: parsed.royaltyPerTransaction !== undefined ? parsed.royaltyPerTransaction : 1.82,
-        estimatedTransactions: parsed.estimatedTransactions !== undefined ? parsed.estimatedTransactions : 2
+        estimatedTransactions: parsed.estimatedTransactions !== undefined ? parsed.estimatedTransactions : 2,
+        onboardingFeeAmount: parsed.onboardingFeeAmount || 0,
+        onboardingFeeTitle: parsed.onboardingFeeTitle || 'Custom Onboarding Fee',
+        onboardingFeeDescription: parsed.onboardingFeeDescription || 'Setup sCOA, hierarchy, benchmarking, KPI reporting and forecasting, and setup custom scorecards. This is white-glove onboarding with dedicated support to ensure your success from day one.',
+        quoteStartDate: parsed.quoteStartDate || new Date().toISOString().split('T')[0],
+        quoteExpirationDays: parsed.quoteExpirationDays ?? 14
       };
     }
   } catch (error) {
@@ -305,7 +179,12 @@ function loadSavedSettings(): {
     royaltyProcessingEnabled: false,
     royaltyBaseFee: 0,
     royaltyPerTransaction: 1.82,
-    estimatedTransactions: 2
+    estimatedTransactions: 2,
+    onboardingFeeAmount: 0,
+    onboardingFeeTitle: 'Custom Onboarding Fee',
+    onboardingFeeDescription: 'Setup sCOA, hierarchy, benchmarking, KPI reporting and forecasting, and setup custom scorecards. This is white-glove onboarding with dedicated support to ensure your success from day one.',
+    quoteStartDate: new Date().toISOString().split('T')[0],
+    quoteExpirationDays: 14
   };
 }
 
@@ -369,6 +248,17 @@ function App() {
     embedConfig.initialEstimatedTransactions ?? savedSettings.estimatedTransactions
   );
 
+  // Onboarding Fee state (URL parameters take precedence over saved settings)
+  const [onboardingFeeAmount, setOnboardingFeeAmount] = useState(
+    embedConfig.initialOnboardingFeeAmount ?? savedSettings.onboardingFeeAmount
+  );
+  const [onboardingFeeTitle, setOnboardingFeeTitle] = useState(
+    embedConfig.initialOnboardingFeeTitle ?? savedSettings.onboardingFeeTitle
+  );
+  const [onboardingFeeDescription, setOnboardingFeeDescription] = useState(
+    embedConfig.initialOnboardingFeeDescription ?? savedSettings.onboardingFeeDescription
+  );
+
   // Quote mode state
   const [quoteMode, setQuoteMode] = useState(embedConfig.mode === 'quote');
   const [quoteId, setQuoteId] = useState<string | null>(embedConfig.quoteId);
@@ -377,8 +267,19 @@ function App() {
   const [quoteLockedAt, setQuoteLockedAt] = useState<string | null>(null);
   const [currentPricingModelId, setCurrentPricingModelId] = useState<string | null>(null);
 
-  // UI state for optional features section
-  const [showOptionalFeatures, setShowOptionalFeatures] = useState(false);
+  // Admin mode state (for salespeople)
+  const [adminMode, setAdminMode] = useState(embedConfig.adminMode);
+
+  // Quote expiration settings (admin-configurable)
+  const [quoteStartDate, setQuoteStartDate] = useState<string>(
+    savedSettings.quoteStartDate || new Date().toISOString().split('T')[0]
+  );
+  const [quoteExpirationDays, setQuoteExpirationDays] = useState<number>(
+    savedSettings.quoteExpirationDays ?? 14 // Default 14 days (research-backed optimal)
+  );
+
+  // UI state for royalty add-on
+  const [showRoyaltyAddon, setShowRoyaltyAddon] = useState(false);
 
   const currentPlan = planConfigs[selectedPlan];
 
@@ -391,6 +292,9 @@ function App() {
     sendSelectionUpdate,
     sendUserAction,
     sendEnterpriseInquiry,
+    sendQuoteMessage,
+    sendQuoteError,
+    incomingMessage,
   } = useIframeMessaging({ enabled: embedConfig.isEmbedded });
 
   // Calculate all pricing values BEFORE useEffect hooks that reference them
@@ -447,15 +351,18 @@ function App() {
   // Calculate volume savings for current tier
   const volumeSavingsPercent = calculateVolumeSavings(count, currentTierIndex, currentPlan.pricingTiers);
 
-  // Auto-trigger ContactModal when count reaches enterprise threshold
+  // Determine if controls should be disabled (locked, accepted, or expired)
+  const isLocked = quoteMode && (quoteStatus === 'locked' || quoteStatus === 'accepted' || quoteStatus === 'expired');
+
+  // Auto-trigger ContactModal when count reaches enterprise threshold (skip for admins)
   useEffect(() => {
-    if (count >= currentPlan.contactThreshold) {
+    if (count >= currentPlan.contactThreshold && !isLocked && !adminMode) {
       setIsEnterpriseRequest(false);
       setShowContactModal(true);
       // Send enterprise inquiry event
       sendEnterpriseInquiry(count, currentPlan.name);
     }
-  }, [count, currentPlan.contactThreshold, currentPlan.name, sendEnterpriseInquiry]);
+  }, [count, currentPlan.contactThreshold, currentPlan.name, sendEnterpriseInquiry, isLocked, adminMode]);
 
   // Quote mode initialization
   useEffect(() => {
@@ -483,6 +390,51 @@ function App() {
           if (existingQuote.is_annual !== undefined) {
             setIsAnnual(existingQuote.is_annual);
           }
+
+          // Restore settings from selection_raw
+          if (existingQuote.selection_raw) {
+            const raw = existingQuote.selection_raw as any;
+
+            // Restore custom discount
+            if (raw.customDiscount) {
+              setCustomDiscountType(raw.customDiscount.type || null);
+              setCustomDiscountValue(raw.customDiscount.value || 0);
+              setCustomDiscountLabel(raw.customDiscount.label || '');
+              setCustomDiscountReason(raw.customDiscount.reason || '');
+            } else {
+              // Clear custom discount if not in quote
+              setCustomDiscountType(null);
+              setCustomDiscountValue(0);
+              setCustomDiscountLabel('');
+              setCustomDiscountReason('');
+            }
+
+            // Restore royalty processing
+            if (raw.royaltyProcessing) {
+              setRoyaltyProcessingEnabled(raw.royaltyProcessing.enabled || false);
+              setRoyaltyBaseFee(raw.royaltyProcessing.baseFee || 0);
+              setRoyaltyPerTransaction(raw.royaltyProcessing.perTransaction || 1.82);
+              setEstimatedTransactions(raw.royaltyProcessing.estimatedTransactions || 2);
+            } else {
+              // Clear royalty processing if not in quote
+              setRoyaltyProcessingEnabled(false);
+              setRoyaltyBaseFee(0);
+              setRoyaltyPerTransaction(1.82);
+              setEstimatedTransactions(2);
+            }
+
+            // Restore onboarding fee
+            if (raw.onboardingFee) {
+              setOnboardingFeeAmount(raw.onboardingFee.amount || 0);
+              setOnboardingFeeTitle(raw.onboardingFee.title || 'Custom Onboarding Fee');
+              setOnboardingFeeDescription(raw.onboardingFee.description || 'Setup sCOA, hierarchy, benchmarking, KPI reporting and forecasting, and setup custom scorecards. This is white-glove onboarding with dedicated support to ensure your success from day one.');
+            } else {
+              // Clear onboarding fee if not in quote
+              setOnboardingFeeAmount(0);
+              setOnboardingFeeTitle('Custom Onboarding Fee');
+              setOnboardingFeeDescription('Setup sCOA, hierarchy, benchmarking, KPI reporting and forecasting, and setup custom scorecards. This is white-glove onboarding with dedicated support to ensure your success from day one.');
+            }
+          }
         } else {
           // Generate new quote ID
           const newId = crypto.randomUUID();
@@ -500,12 +452,22 @@ function App() {
           setQuoteStatus('draft');
 
           // Emit QUOTE_ID_READY message
-          if (isInIframe && embedConfig.isEmbedded) {
-            window.parent.postMessage({ type: 'QUOTE_ID_READY', data: { id: newId } }, '*');
-          }
+          sendQuoteMessage('QUOTE_ID_READY', {
+            id: newId,
+            version: 1,
+            pricingModelId: newQuote.pricing_model_id,
+            status: 'draft',
+            expiresAt: null,
+            payload: newQuote
+          });
         }
       } catch (error) {
         console.error('Failed to initialize quote:', error);
+        sendQuoteError(
+          error instanceof Error ? error.message : 'Failed to initialize quote',
+          'UNKNOWN',
+          { error }
+        );
       }
     };
 
@@ -514,7 +476,7 @@ function App() {
 
   // Send selection updates whenever pricing-related state changes
   useEffect(() => {
-    if (count < currentPlan.contactThreshold) {
+    if (count < currentPlan.contactThreshold || isLocked) {
       sendSelectionUpdate({
         selectedPlan,
         count,
@@ -587,6 +549,7 @@ function App() {
     currentPlan,
     calculatedAiTokens,
     sendSelectionUpdate,
+    isLocked,
   ]);
 
   // Debounced quote updates (only in draft mode)
@@ -636,31 +599,37 @@ function App() {
               estimatedTransactions: estimatedTransactions,
               totalFee: royaltyProcessingFee,
             } : null,
+            onboardingFee: onboardingFeeAmount > 0 ? {
+              amount: onboardingFeeAmount,
+              title: onboardingFeeTitle,
+              description: onboardingFeeDescription,
+            } : null,
           },
         };
 
         await quoteApi.updateQuote(quoteId, summary);
 
         // Emit QUOTE_SUMMARY_UPDATE message
-        if (isInIframe && embedConfig.isEmbedded) {
-          window.parent.postMessage({
-            type: 'QUOTE_SUMMARY_UPDATE',
-            data: {
-              id: quoteId,
-              selectedPlan,
-              count,
-              isAnnual,
-              currency: 'USD',
-              priceBreakdown: summary.price_breakdown,
-              planDetails: summary.plan_details,
-              selectionRaw: summary.selection_raw,
-              pricingModelId: currentPricingModelId,
-              expiresInDays: embedConfig.expiresInDays,
-            },
-          }, '*');
-        }
+        sendQuoteMessage('QUOTE_SUMMARY_UPDATE', {
+          id: quoteId,
+          version: quoteStatus === 'locked' ? 2 : 1,
+          selectedPlan,
+          count,
+          isAnnual,
+          currency: 'USD',
+          priceBreakdown: summary.price_breakdown,
+          planDetails: summary.plan_details,
+          selectionRaw: summary.selection_raw,
+          pricingModelId: currentPricingModelId,
+          expiresInDays: embedConfig.expiresInDays,
+        });
       } catch (error) {
         console.error('Failed to update quote:', error);
+        sendQuoteError(
+          error instanceof Error ? error.message : 'Failed to update quote',
+          'UNKNOWN',
+          { quoteId, error }
+        );
       }
     }, 300); // 300ms debounce
 
@@ -689,6 +658,9 @@ function App() {
     royaltyBaseFee,
     royaltyPerTransaction,
     estimatedTransactions,
+    onboardingFeeAmount,
+    onboardingFeeTitle,
+    onboardingFeeDescription,
     currentPricingModelId,
     isInIframe,
     embedConfig,
@@ -773,7 +745,12 @@ function App() {
     newRoyaltyProcessingEnabled: boolean,
     newRoyaltyBaseFee: number,
     newRoyaltyPerTransaction: number,
-    newEstimatedTransactions: number
+    newEstimatedTransactions: number,
+    newOnboardingFeeAmount: number,
+    newOnboardingFeeTitle: string,
+    newOnboardingFeeDescription: string,
+    newQuoteStartDate: string,
+    newQuoteExpirationDays: number
   ) => {
     setPlanConfigs(updatedConfigs);
     setWholesaleDiscount(newWholesaleDiscount);
@@ -786,6 +763,11 @@ function App() {
     setRoyaltyBaseFee(newRoyaltyBaseFee);
     setRoyaltyPerTransaction(newRoyaltyPerTransaction);
     setEstimatedTransactions(newEstimatedTransactions);
+    setOnboardingFeeAmount(newOnboardingFeeAmount);
+    setOnboardingFeeTitle(newOnboardingFeeTitle);
+    setOnboardingFeeDescription(newOnboardingFeeDescription);
+    setQuoteStartDate(newQuoteStartDate);
+    setQuoteExpirationDays(newQuoteExpirationDays);
 
     // Save to localStorage
     try {
@@ -800,7 +782,12 @@ function App() {
         royaltyProcessingEnabled: newRoyaltyProcessingEnabled,
         royaltyBaseFee: newRoyaltyBaseFee,
         royaltyPerTransaction: newRoyaltyPerTransaction,
-        estimatedTransactions: newEstimatedTransactions
+        estimatedTransactions: newEstimatedTransactions,
+        onboardingFeeAmount: newOnboardingFeeAmount,
+        onboardingFeeTitle: newOnboardingFeeTitle,
+        onboardingFeeDescription: newOnboardingFeeDescription,
+        quoteStartDate: newQuoteStartDate,
+        quoteExpirationDays: newQuoteExpirationDays
       }));
     } catch (error) {
       console.error('Failed to save settings:', error);
@@ -812,26 +799,28 @@ function App() {
     if (!quoteId) return;
 
     try {
-      const lockedQuote = await quoteApi.lockQuote(quoteId, embedConfig.expiresInDays);
+      const lockedQuote = await quoteApi.lockQuote(quoteId, quoteExpirationDays);
       setQuoteStatus('locked');
       setQuoteExpiresAt(lockedQuote.expires_at);
       setQuoteLockedAt(lockedQuote.locked_at);
 
       // Emit QUOTE_LOCKED message
-      if (isInIframe && embedConfig.isEmbedded) {
-        window.parent.postMessage({
-          type: 'QUOTE_LOCKED',
-          data: {
-            id: quoteId,
-            version: lockedQuote.version,
-            expiresAt: lockedQuote.expires_at,
-            status: 'locked',
-            pricingModelId: currentPricingModelId,
-          },
-        }, '*');
-      }
+      sendQuoteMessage('QUOTE_LOCKED', {
+        id: quoteId,
+        version: lockedQuote.version,
+        expiresAt: lockedQuote.expires_at,
+        lockedAt: lockedQuote.locked_at,
+        status: 'locked',
+        pricingModelId: currentPricingModelId,
+        payload: lockedQuote
+      });
     } catch (error) {
       console.error('Failed to lock quote:', error);
+      sendQuoteError(
+        error instanceof Error ? error.message : 'Failed to lock quote',
+        'UNKNOWN',
+        { quoteId, error }
+      );
       alert('Failed to lock quote. Please try again.');
     }
   };
@@ -840,17 +829,63 @@ function App() {
     if (!quoteId) return;
 
     // Emit QUOTE_ACCEPT_INTENT message (parent handles click-wrap)
-    if (isInIframe && embedConfig.isEmbedded) {
-      window.parent.postMessage({
-        type: 'QUOTE_ACCEPT_INTENT',
-        data: {
-          id: quoteId,
-          version: 2, // Locked quotes have version 2
-          pricingModelId: currentPricingModelId,
-        },
-      }, '*');
-    }
+    sendQuoteMessage('QUOTE_ACCEPT_INTENT', {
+      id: quoteId,
+      version: 2, // Locked quotes have version 2
+      status: 'locked',
+      pricingModelId: currentPricingModelId,
+    });
   };
+
+  // Handle incoming CONFIRM_QUOTE_ACCEPTANCE message from parent
+  useEffect(() => {
+    if (!incomingMessage || incomingMessage.type !== 'CONFIRM_QUOTE_ACCEPTANCE') return;
+    if (!quoteId || quoteStatus !== 'locked') return;
+
+    const acceptQuote = async () => {
+      try {
+        // Update quote status to accepted in database
+        const acceptedAt = incomingMessage.data?.acceptedAt || new Date().toISOString();
+
+        // Here you would call an API to mark the quote as accepted
+        // For now, we'll just update local state and send confirmation
+        setQuoteStatus('accepted');
+
+        // Send QUOTE_ACCEPTED confirmation back to parent
+        sendQuoteMessage('QUOTE_ACCEPTED', {
+          id: quoteId,
+          version: 2,
+          status: 'accepted',
+          acceptedAt: acceptedAt,
+          pricingModelId: currentPricingModelId,
+        });
+
+        console.log('[PricingCalculator] Quote accepted:', {
+          quoteId,
+          acceptedAt,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Failed to accept quote:', error);
+        sendQuoteError(
+          error instanceof Error ? error.message : 'Failed to accept quote',
+          'UNKNOWN',
+          { quoteId, error }
+        );
+      }
+    };
+
+    acceptQuote();
+  }, [incomingMessage, quoteId, quoteStatus, currentPricingModelId, sendQuoteMessage, sendQuoteError]);
+
+  // Handle incoming SET_ADMIN_MODE message from parent
+  useEffect(() => {
+    if (!incomingMessage || incomingMessage.type !== 'SET_ADMIN_MODE') return;
+
+    const enabled = incomingMessage.data?.enabled ?? false;
+    setAdminMode(enabled);
+    console.log('[PricingCalculator] Admin mode set to:', enabled);
+  }, [incomingMessage]);
 
   // Copy share link to clipboard
   const handleCopyShareLink = async () => {
@@ -867,9 +902,6 @@ function App() {
       alert('Failed to copy link. Please try again.');
     }
   };
-
-  // Determine if controls should be disabled (locked, accepted, or expired)
-  const isLocked = quoteMode && (quoteStatus === 'locked' || quoteStatus === 'accepted' || quoteStatus === 'expired');
 
   // Determine background color based on theme
   const backgroundColor = embedConfig.theme === 'transparent'
@@ -898,6 +930,10 @@ function App() {
             status={quoteStatus}
             expiresAt={quoteExpiresAt}
             lockedAt={quoteLockedAt}
+            onScheduleMeeting={() => {
+              setIsEnterpriseRequest(true);
+              setShowContactModal(true);
+            }}
           />
         )}
 
@@ -985,13 +1021,16 @@ function App() {
                 setCompanies={setCount}
                 pricingTiers={currentPlan.pricingTiers}
                 label={selectedPlan === 'ai-advisor' ? "Select Number of Users" : `Select Number of ${terminology.capitalized}`}
-                maxCompanies={currentPlan.contactThreshold}
+                maxCompanies={adminMode ? 500 : currentPlan.contactThreshold}
                 contactThreshold={currentPlan.contactThreshold}
                 onExceedThreshold={() => {
-                  setIsEnterpriseRequest(false);
-                  setShowContactModal(true);
+                  if (!adminMode) {
+                    setIsEnterpriseRequest(false);
+                    setShowContactModal(true);
+                  }
                 }}
                 disabled={isLocked}
+                adminMode={adminMode}
               />
 
               {/* Volume Discount Indicator */}
@@ -1069,8 +1108,8 @@ function App() {
             </div>
           </div>
 
-          {/* Only show Price Summary when below enterprise threshold */}
-          {count < currentPlan.contactThreshold && (
+          {/* Only show Price Summary when below enterprise threshold or quote is locked */}
+          {(count < currentPlan.contactThreshold || isLocked) && (
             <div className="bg-white rounded-lg shadow-sm border border-[#1239FF]/10 overflow-hidden">
               <div className="bg-[#1239FF] text-white p-2">
                 <h2 className="text-sm font-semibold">Price Summary</h2>
@@ -1193,64 +1232,91 @@ function App() {
                         7-day free trial
                       </span>
                     </div>
+
+                    {/* Social Proof */}
+                    <a
+                      href="https://www.autymate.com/reviews"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex justify-center items-center gap-2 mt-3 text-sm text-gray-700 hover:text-[#1239FF] smooth-transition border-t border-gray-200 pt-3"
+                    >
+                      <div className="flex gap-0.5">
+                        {[...Array(5)].map((_, i) => (
+                          <span key={i} className="text-orange-400">⭐</span>
+                        ))}
+                      </div>
+                      <span className="font-semibold">1,000+ 5-star reviews</span>
+                      <span className="text-xs text-gray-500">→</span>
+                    </a>
                   </>
                 )}
               </div>
 
-              {/* Optional Features Section */}
-              {selectedPlan !== 'ai-advisor' && !quoteMode && (
+              {/* Royalty Processing Add-on */}
+              {selectedPlan !== 'ai-advisor' && (
                 <div className="border-t border-gray-200 pt-3 mt-3">
-                  <button
-                    onClick={() => setShowOptionalFeatures(!showOptionalFeatures)}
-                    className="flex items-center justify-between w-full text-sm text-gray-700 hover:text-gray-900 font-medium py-2"
-                  >
-                    <span>Optional Features</span>
-                    <ChevronDown className={`w-4 h-4 transition-transform ${showOptionalFeatures ? 'rotate-180' : ''}`} />
-                  </button>
+                  {!showRoyaltyAddon && !royaltyProcessingEnabled && (
+                    <button
+                      onClick={() => {
+                        setShowRoyaltyAddon(true);
+                        setRoyaltyProcessingEnabled(true);
+                      }}
+                      disabled={isLocked}
+                      className={`text-sm text-blue-600 hover:text-blue-800 flex items-center gap-2 w-full justify-center py-2 hover:bg-blue-50 rounded transition-colors ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <span>+ Add Royalty Processing</span>
+                      <span className="text-xs text-gray-600">
+                        (~${(royaltyPerTransaction * 2 * count).toFixed(2)}/mo for 2 txns)
+                      </span>
+                    </button>
+                  )}
 
-                  {showOptionalFeatures && (
-                    <div className="mt-3 space-y-3">
-                      {/* Royalty Processing Toggle */}
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={royaltyProcessingEnabled}
-                            onChange={(e) => setRoyaltyProcessingEnabled(e.target.checked)}
-                            disabled={isLocked}
-                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                          />
-                          <span className="text-sm font-medium text-gray-900">
-                            Royalty Processing
-                          </span>
-                        </label>
-
-                        <p className="text-xs text-gray-600 mt-1 ml-6">
-                          Included with plan - pay only ACH fees ($1.82/transaction)
-                        </p>
-
-                        {royaltyProcessingEnabled && (
-                          <div className="mt-3 ml-6">
-                            <label className="block text-xs text-gray-700 mb-1">
-                              Est. transactions per {terminology.singular} per month:
-                            </label>
+                  {(showRoyaltyAddon || royaltyProcessingEnabled) && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
                             <input
-                              type="number"
-                              min="0"
-                              value={estimatedTransactions}
-                              onChange={(e) => setEstimatedTransactions(parseInt(e.target.value) || 0)}
+                              type="checkbox"
+                              checked={royaltyProcessingEnabled}
+                              onChange={(e) => setRoyaltyProcessingEnabled(e.target.checked)}
                               disabled={isLocked}
-                              className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              className="w-4 h-4"
                             />
-
+                            <span className="font-medium text-sm">Royalty Processing</span>
+                          </div>
+                          <p className="text-xs text-gray-600 ml-6 mb-2">
+                            Included with plan - pay only ACH fees ($1.82/transaction)
+                          </p>
+                          <div className="ml-6">
+                            <label className="text-xs text-gray-700">
+                              Transactions per {terminology.singular}/month:
+                              <input
+                                type="number"
+                                min="0"
+                                value={estimatedTransactions}
+                                onChange={(e) => setEstimatedTransactions(parseInt(e.target.value) || 0)}
+                                disabled={isLocked}
+                                className="ml-2 w-16 px-2 py-1 border rounded text-sm"
+                              />
+                            </label>
                             {estimatedTransactions > 0 && (
-                              <p className="text-xs text-gray-600 mt-2">
+                              <p className="text-xs text-gray-600 mt-1">
                                 Cost: ${(royaltyPerTransaction * estimatedTransactions * count).toFixed(2)}/mo
-                                <br />
-                                ({estimatedTransactions} txns × {count} {terminology.plural} × ${royaltyPerTransaction})
                               </p>
                             )}
                           </div>
+                        </div>
+                        {!isLocked && (
+                          <button
+                            onClick={() => {
+                              setShowRoyaltyAddon(false);
+                              setRoyaltyProcessingEnabled(false);
+                            }}
+                            className="text-xs text-red-600 hover:text-red-800 ml-2"
+                          >
+                            Remove
+                          </button>
                         )}
                       </div>
                     </div>
@@ -1271,16 +1337,11 @@ function App() {
                 {showPricingDetails && (
                   <div className="bg-gray-50 rounded-lg p-2 md:p-3 mt-3 text-xs md:text-sm">
                     <div className="space-y-2">
-                      <div className="border-b border-gray-200 pb-2">
-                        <div className="font-medium text-sm md:text-base">{selectedPlan === 'ai-advisor' ? 'Users' : terminology.capitalized} ({count}):</div>
-                        <div className="flex justify-between text-[#180D43]/70 text-xs md:text-sm">
-                          <span className="truncate mr-2">${formatNumber(basePrice.total / count)} each</span>
-                          <span className="whitespace-nowrap">${formatNumber(basePrice.total)}/mo</span>
-                        </div>
-                        <div className="flex justify-between font-medium mt-1 text-xs md:text-sm">
-                          <span>Subtotal:</span>
-                          <span className="whitespace-nowrap">${formatNumber(basePrice.total)}/mo</span>
-                        </div>
+                      <div className="flex justify-between pb-2 border-b border-gray-200">
+                        <span className="font-medium text-sm md:text-base">
+                          {count} {selectedPlan === 'ai-advisor' ? (count === 1 ? 'user' : 'users') : (count === 1 ? terminology.singular : terminology.plural)} × ${formatNumber(basePrice.total / count)} each
+                        </span>
+                        <span className="font-medium text-sm md:text-base whitespace-nowrap">${formatNumber(basePrice.total)}/mo</span>
                       </div>
 
                       {wholesaleDiscount > 0 && !isAnnual && (
@@ -1363,6 +1424,36 @@ function App() {
                           <span className="text-[#1239FF]">${formatNumber(finalPriceWithRoyalty)}/mo</span>
                         </div>
                       </div>
+
+                      {onboardingFeeAmount > 0 && (
+                        <div className="border-t border-gray-200 pt-2 mt-2">
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-[#180D43]">{onboardingFeeTitle}</span>
+                                  {onboardingFeeDescription && (
+                                    <Tooltip content={onboardingFeeDescription} position="top" />
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="inline-block bg-gradient-to-r from-amber-600 to-orange-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                                    ONE-TIME FEE
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="font-bold text-lg text-amber-700">
+                                ${formatNumber(onboardingFeeAmount)}
+                              </span>
+                            </div>
+                            {onboardingFeeDescription && (
+                              <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+                                {onboardingFeeDescription}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1472,7 +1563,7 @@ function App() {
       {/* Feature Comparison Table */}
       <FeatureComparison selectedPlan={selectedPlan} />
 
-      {(!embedConfig.hideSettings || quoteMode) && (
+      {adminMode && (
         <Settings
           planConfigs={planConfigs}
           wholesaleDiscount={wholesaleDiscount}
@@ -1485,6 +1576,11 @@ function App() {
           royaltyBaseFee={royaltyBaseFee}
           royaltyPerTransaction={royaltyPerTransaction}
           estimatedTransactions={estimatedTransactions}
+          onboardingFeeAmount={onboardingFeeAmount}
+          onboardingFeeTitle={onboardingFeeTitle}
+          onboardingFeeDescription={onboardingFeeDescription}
+          quoteStartDate={quoteStartDate}
+          quoteExpirationDays={quoteExpirationDays}
           onUpdatePricing={handlePricingUpdate}
           isEmbedded={embedConfig.isEmbedded}
           terminology={terminology}

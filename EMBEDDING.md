@@ -91,6 +91,7 @@ Customize the pricing calculator behavior using URL parameters:
 ### Optional Customization
 - `&theme=transparent` - Removes background color for seamless integration
 - `&hideSettings=true` - Hides the admin settings button
+- `&admin=true` - **Admin mode for salespeople** (`isAdmin` property - see [Admin Mode](#admin-mode-new) section below)
 - `&plan=growth` - Pre-select a plan (`ai-advisor`, `starter`, `growth`, `scale`)
 - `&count=25` - Pre-fill companies/users count
 - `&annual=true` - Pre-select annual billing (`true` or `false`)
@@ -101,6 +102,9 @@ Customize the pricing calculator behavior using URL parameters:
 - `&royaltyBaseFee=0` - Set base fee per location per month (default: $0)
 - `&royaltyPerTx=1.82` - Set per-transaction ACH fee (default: $1.82, includes $0.32 WorldPay fee + $1.50 service fee)
 - `&royaltyTxCount=2` - Set estimated transactions per location per month (default: 2)
+- `&onboardingFee=5000` - Set one-time onboarding fee amount (default: 0)
+- `&onboardingTitle=Custom%20Setup` - Set onboarding fee title (URL-encoded, default: "Custom Onboarding Fee")
+- `&onboardingDesc=Full%20setup` - Set onboarding fee description (URL-encoded, default: comprehensive onboarding text)
 
 ### Example: Full Configuration
 ```html
@@ -580,7 +584,7 @@ Sent when user locks the quote (freezes pricing for 30 days).
 ```
 
 #### QUOTE_ACCEPT_INTENT
-Sent when user clicks "Accept Quote" button. **Parent should handle click-wrap terms acceptance.**
+Sent when user clicks "Accept Quote" button. **Parent should handle click-wrap terms acceptance and send CONFIRM_QUOTE_ACCEPTANCE back.**
 
 ```javascript
 {
@@ -588,15 +592,231 @@ Sent when user clicks "Accept Quote" button. **Parent should handle click-wrap t
   data: {
     id: '550e8400-e29b-41d4-a716-446655440000',
     version: 2,
+    status: 'locked',
     pricingModelId: 'uuid-of-pricing-model'
   }
 }
 ```
 
-### Quote Mode Integration Example
+#### QUOTE_ACCEPTED (NEW - Bidirectional)
+Sent after parent confirms quote acceptance via CONFIRM_QUOTE_ACCEPTANCE message. This completes the bidirectional acceptance flow.
 
 ```javascript
-// Listen for quote events
+{
+  type: 'QUOTE_ACCEPTED',
+  data: {
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    version: 2,
+    status: 'accepted',
+    acceptedAt: '2025-11-04T15:30:00Z',      // Timestamp when accepted
+    pricingModelId: 'uuid-of-pricing-model'
+  }
+}
+```
+
+#### QUOTE_ERROR (NEW)
+Sent when any quote operation fails (initialization, update, lock, accept).
+
+```javascript
+{
+  type: 'QUOTE_ERROR',
+  data: {
+    error: 'Failed to lock quote',           // Error message
+    code: 'NETWORK_ERROR',                   // Error code (optional)
+    details: { /* additional error context */ }
+  }
+}
+```
+
+**Error Codes:**
+- `EXPIRED` - Quote has expired
+- `NOT_FOUND` - Quote ID not found in database
+- `VALIDATION_ERROR` - Invalid quote data
+- `NETWORK_ERROR` - Network/API failure
+- `UNKNOWN` - Unexpected error
+
+## Admin Mode (NEW!)
+
+### Overview
+Admin Mode (`isAdmin` property) is designed for salespeople and administrators who need to:
+- Configure pricing beyond normal customer limits (up to 500 locations vs. 50)
+- Access Settings even when `hideSettings=true` is set
+- Avoid triggering Contact Sales modals when exceeding thresholds
+- See exact location counts instead of "50+" for high-volume quotes
+
+### Quick Reference
+
+| Feature | Regular User | Admin User (`isAdmin=true`) |
+|---------|--------------|----------------------------|
+| **Max Locations** | 50 | 500 |
+| **Settings Button** | Hidden (always) | Visible (always) |
+| **Contact Sales Modal** | Auto-shows at 50+ locations | Disabled |
+| **Location Count Display** | "50+" when ≥50 | Exact count (e.g., "87") |
+| **Slider Range** | 1-50 | 1-500 |
+| **Quote Configuration** | Limited to threshold | Full control |
+
+**Note**: Settings button is ONLY visible when `admin=true`. It is hidden in all other cases, including quote mode and standalone mode.
+
+### Enabling Admin Mode
+
+**Option 1: URL Parameter (Standalone)**
+```html
+<iframe
+  src="https://your-url.com?admin=true&embedded=true&hideSettings=true"
+  width="100%"
+  height="900"
+></iframe>
+```
+
+**Option 2: Parent Window Message (Embedded)**
+```javascript
+// Get reference to iframe
+const calculatorIframe = document.getElementById('pricing-calculator');
+
+// Enable admin mode dynamically
+calculatorIframe.contentWindow.postMessage({
+  type: 'SET_ADMIN_MODE',
+  data: {
+    enabled: true  // Set to false to disable admin mode
+  }
+}, '*');
+```
+
+### Admin Mode Features
+
+When admin mode is enabled:
+
+1. **Extended Location Limits**: Maximum locations increased from 50 to 500
+2. **Settings Always Visible**: Settings gear button shown (hidden for all regular users)
+3. **No Contact Modal**: Contact Sales modal will NOT auto-trigger at 50+ locations
+4. **Exact Count Display**: Shows precise count (e.g., "87") instead of "50+" for non-admins
+5. **Full Quote Control**: Can configure and lock quotes with any number of locations
+
+**Important**: The Settings gear button is **ONLY** visible when:
+- `?admin=true` is set
+
+Without this parameter, Settings is always hidden in all modes (quote mode, embedded mode, standalone mode).
+
+### Use Cases
+
+**Salesperson Creating Custom Quote:**
+```html
+<!-- Salesperson view with full admin access -->
+<iframe
+  src="https://your-url.com?mode=quote&admin=true&plan=growth&count=125&annual=true"
+  width="100%"
+  height="900"
+></iframe>
+```
+
+**Customer View (Locked Quote):**
+```html
+<!-- Customer sees locked quote but without admin privileges -->
+<iframe
+  src="https://your-url.com?mode=quote&id=550e8400-e29b-41d4-a716-446655440000"
+  width="100%"
+  height="900"
+></iframe>
+```
+
+### Admin Mode Message Type
+
+#### SET_ADMIN_MODE (Incoming)
+Control admin mode programmatically from the parent window.
+
+```javascript
+// Enable admin mode
+calculatorIframe.contentWindow.postMessage({
+  type: 'SET_ADMIN_MODE',
+  data: { enabled: true }
+}, '*');
+
+// Disable admin mode
+calculatorIframe.contentWindow.postMessage({
+  type: 'SET_ADMIN_MODE',
+  data: { enabled: false }
+}, '*');
+```
+
+### Implementation Details
+
+The `isAdmin` property affects the following frontend behaviors:
+
+**File: `src/App.tsx`**
+- Sets `adminMode` state from URL parameter `?admin=true`
+- Can be toggled via `SET_ADMIN_MODE` iframe message
+- Passes `adminMode` prop to `CompanySlider` component
+- Adjusts `maxCompanies` from 50 to 500 when `adminMode=true`
+- **Shows Settings ONLY when `adminMode=true`** (hidden in all other cases)
+- Disables ContactModal auto-trigger at 50+ locations
+
+**File: `src/components/CompanySlider.tsx`**
+- Receives `adminMode` prop
+- Displays exact count when `adminMode=true`
+- Displays "50+" when `adminMode=false` and count ≥ 50
+
+**File: `src/hooks/useIframeMessaging.ts`**
+- Listens for `SET_ADMIN_MODE` incoming messages
+- Updates `adminMode` state dynamically
+
+### Property Name: `isAdmin`
+
+Throughout the documentation, this feature is referred to as the **`isAdmin` property** or **Admin Mode**. In the code:
+- **State variable**: `adminMode` (boolean)
+- **URL parameter**: `?admin=true`
+- **Iframe message type**: `SET_ADMIN_MODE`
+- **Component prop**: `adminMode` (passed to components)
+
+### Security Considerations
+
+⚠️ **IMPORTANT**: Admin mode (`isAdmin`) does NOT provide authentication. It's a **presentation/UX feature**, NOT a security control.
+
+- ✅ Removes UI friction for internal sales tools
+- ✅ Allows configuration of high-volume quotes
+- ✅ Works via URL parameter or iframe messaging
+- ❌ Does NOT enforce server-side access control
+- ❌ Does NOT validate user permissions on backend
+- ❌ Should NOT be exposed to untrusted users
+
+**Best Practice:** Use admin mode only in internal sales portals or authenticated contexts where you control access to the pricing calculator URL.
+
+**Backend Considerations:**
+- The API endpoints **do not enforce** admin mode restrictions
+- Database accepts quotes with any location count (no admin-only validation)
+- If you need server-side restrictions, implement authentication and authorization in your API layer
+
+### Incoming Messages (Parent → Iframe)
+
+The calculator can receive messages from the parent window to control quote acceptance and admin mode.
+
+**Supported incoming message types:**
+- `CONFIRM_QUOTE_ACCEPTANCE` - Complete quote acceptance flow after click-wrap terms
+- `SET_ADMIN_MODE` - Enable/disable admin mode for salespeople (see Admin Mode section above)
+
+#### CONFIRM_QUOTE_ACCEPTANCE
+Send this message to the calculator iframe after user accepts click-wrap terms to complete quote acceptance.
+
+```javascript
+// Get reference to iframe
+const iframe = document.getElementById('pricing-calculator');
+
+// Send confirmation message
+iframe.contentWindow.postMessage({
+  type: 'CONFIRM_QUOTE_ACCEPTANCE',
+  data: {
+    id: '550e8400-e29b-41d4-a716-446655440000',  // Quote ID
+    acceptedAt: new Date().toISOString()          // Optional: acceptance timestamp
+  }
+}, '*');
+```
+
+### Quote Mode Integration Example (Bidirectional Flow)
+
+```javascript
+// Store reference to iframe for sending messages
+const calculatorIframe = document.getElementById('pricing-calculator');
+
+// Listen for quote events from calculator
 window.addEventListener('message', function(event) {
   const message = event.data;
 
@@ -632,35 +852,145 @@ window.addEventListener('message', function(event) {
       break;
 
     case 'QUOTE_ACCEPT_INTENT':
-      // User clicked "Accept Quote" - show your terms/click-wrap
+      // User clicked "Accept Quote" - show your click-wrap modal
       console.log('User wants to accept quote:', message.data.id);
 
-      // Show your terms modal
-      showTermsModal({
+      // Show your terms modal (example using custom modal)
+      showClickWrapModal({
         quoteId: message.data.id,
-        onAccept: () => {
-          // After user accepts terms, optionally send message back
-          // (or handle acceptance in your own system)
+        onAccept: async () => {
+          try {
+            // 1. Record acceptance in your backend
+            await fetch('/api/quotes/accept', {
+              method: 'POST',
+              body: JSON.stringify({
+                quoteId: message.data.id,
+                acceptedAt: new Date().toISOString()
+              })
+            });
 
-          // Notify your backend
-          fetch('/api/quotes/accept', {
-            method: 'POST',
-            body: JSON.stringify({ quoteId: message.data.id })
-          });
+            // 2. Send confirmation back to calculator iframe
+            calculatorIframe.contentWindow.postMessage({
+              type: 'CONFIRM_QUOTE_ACCEPTANCE',
+              data: {
+                id: message.data.id,
+                acceptedAt: new Date().toISOString()
+              }
+            }, '*');
+
+            console.log('Quote acceptance confirmed');
+          } catch (error) {
+            console.error('Failed to confirm acceptance:', error);
+            alert('Failed to accept quote. Please try again.');
+          }
+        },
+        onCancel: () => {
+          console.log('User cancelled quote acceptance');
         }
       });
       break;
+
+    case 'QUOTE_ACCEPTED':
+      // Calculator confirmed quote acceptance
+      console.log('Quote accepted successfully:', message.data);
+
+      // Update your UI to show success
+      document.getElementById('acceptance-status').textContent = 'Quote Accepted!';
+      document.getElementById('acceptance-status').className = 'success';
+
+      // Optionally redirect or show next steps
+      setTimeout(() => {
+        window.location.href = '/onboarding?quote=' + message.data.id;
+      }, 2000);
+      break;
+
+    case 'QUOTE_ERROR':
+      // Handle quote errors
+      console.error('Quote error:', message.data.error, message.data.code);
+
+      // Show user-friendly error message
+      alert('Error: ' + message.data.error);
+      break;
   }
 });
+
+// Example click-wrap modal implementation
+function showClickWrapModal({ quoteId, onAccept, onCancel }) {
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <h2>Accept Quote</h2>
+      <div class="terms-scroll">
+        <p><strong>By accepting this quote, you agree to:</strong></p>
+        <ul>
+          <li>The pricing terms outlined in quote #${quoteId}</li>
+          <li>Our standard Terms of Service</li>
+          <li>Payment within 30 days of service delivery</li>
+        </ul>
+      </div>
+      <label>
+        <input type="checkbox" id="accept-terms" />
+        I have read and agree to the terms above
+      </label>
+      <div class="modal-actions">
+        <button id="confirm-accept" disabled>Accept Quote</button>
+        <button id="cancel-accept">Cancel</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Enable accept button when checkbox is checked
+  document.getElementById('accept-terms').addEventListener('change', (e) => {
+    document.getElementById('confirm-accept').disabled = !e.target.checked;
+  });
+
+  // Handle accept
+  document.getElementById('confirm-accept').addEventListener('click', () => {
+    document.body.removeChild(modal);
+    onAccept();
+  });
+
+  // Handle cancel
+  document.getElementById('cancel-accept').addEventListener('click', () => {
+    document.body.removeChild(modal);
+    onCancel();
+  });
+}
 ```
 
-### Quote Workflow
+### Quote Workflow (Bidirectional)
 
 1. **Draft**: User configures pricing, auto-saves every 300ms
-2. **Lock**: User clicks "Lock Quote for 30 Days" → pricing frozen, expiration set
+   - Calculator sends `QUOTE_ID_READY` on initialization
+   - Calculator sends `QUOTE_SUMMARY_UPDATE` on every change (debounced 300ms)
+
+2. **Lock**: User clicks "Lock Quote for 30 Days"
+   - Calculator sends `QUOTE_LOCKED` message
+   - Pricing frozen, expiration set (30 days from lock)
+   - All controls (sliders, toggles) become disabled
+
 3. **Share**: Copy locked quote URL to share with customer
-4. **Accept**: Customer clicks "Accept Quote" → parent handles terms acceptance
-5. **Expired**: If 30 days pass, quote status becomes "expired"
+   - Quote URL: `?mode=quote&id={uuid}`
+   - Quote can be loaded by anyone with the URL
+
+4. **Accept Intent**: Customer clicks "Accept Quote" button
+   - Calculator sends `QUOTE_ACCEPT_INTENT` to parent
+   - Parent shows click-wrap terms modal
+
+5. **Confirm Acceptance**: User accepts click-wrap terms
+   - Parent sends `CONFIRM_QUOTE_ACCEPTANCE` back to calculator
+   - Calculator updates status to 'accepted'
+   - Calculator sends `QUOTE_ACCEPTED` confirmation back to parent
+
+6. **Expired**: If 30 days pass without acceptance
+   - Quote status becomes "expired"
+   - User can no longer accept the quote
+   - Pricing is no longer guaranteed
+
+**Error Handling**: If any step fails, calculator sends `QUOTE_ERROR` with details
 
 ### Quote Status Visual Indicators
 
@@ -672,7 +1002,39 @@ The calculator shows different banners based on quote status:
 
 When locked, all controls (sliders, plan selectors, toggles) are disabled.
 
+## Additional Documentation
+
+- **[QUOTE_SETTINGS.md](./QUOTE_SETTINGS.md)** - Complete guide for quote settings sync (discounts, royalty processing, onboarding fees)
+- **[API.md](./API.md)** - API endpoint documentation for quote management
+- **[QUICKSTART.md](./QUICKSTART.md)** - Quick start guide for local development
+
 ## Change Log
+
+### Version 2.3.0 (2025-11-04)
+- **NEW: Admin Mode** - Special mode for salespeople with extended capabilities
+- **NEW: SET_ADMIN_MODE Message** - Dynamically enable/disable admin mode via iframe messaging
+- **NEW: Extended Location Limits** - Admin mode supports up to 500 locations (vs. 50 for customers)
+- **NEW: Admin Count Display** - Admins see exact counts, customers see "50+" when over threshold
+- **IMPROVED: Settings Access** - Settings visible in admin mode even with `hideSettings=true`
+- **IMPROVED: Contact Modal** - Auto-trigger disabled for admins at high volumes
+- **IMPROVED: Sales Workflow** - Salespeople can configure high-volume quotes without friction
+
+### Version 2.2.0 (2025-11-04)
+- **NEW: Bidirectional Quote Acceptance** - Full two-way communication for quote acceptance flow
+- **NEW: QUOTE_ACCEPTED Message** - Sent after parent confirms acceptance via `CONFIRM_QUOTE_ACCEPTANCE`
+- **NEW: QUOTE_ERROR Message** - Comprehensive error reporting for all quote operations
+- **NEW: Incoming Message Support** - Calculator can now receive `CONFIRM_QUOTE_ACCEPTANCE` from parent
+- **NEW: Console Logging** - All postMessage calls are logged with timestamps for debugging
+- **IMPROVED: Error Handling** - All quote API failures now send `QUOTE_ERROR` to parent
+- **IMPROVED: Message Types** - Enhanced TypeScript types for all quote messages
+- **IMPROVED: Documentation** - Complete bidirectional flow examples with click-wrap modal
+
+### Version 2.1.0 (2025-11-05)
+- **NEW: Onboarding Fee** - One-time custom onboarding fees with configurable title and description
+- **NEW: Settings Sync** - All settings (discount, royalty, onboarding) sync with quotes automatically
+- **NEW: URL Parameters** - `onboardingFee`, `onboardingTitle`, `onboardingDesc` for pre-configuration
+- **IMPROVED: Quote Loading** - Settings restored from `selection_raw` when loading quotes
+- **IMPROVED: Priority Handling** - Quote settings override localStorage for consistent pricing
 
 ### Version 2.0.0 (2025-11-04)
 - **NEW: Quote Mode** - Generate, lock, and share pricing quotes

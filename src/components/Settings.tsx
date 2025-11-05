@@ -1,35 +1,8 @@
 import React, { useState } from 'react';
 import { Settings2, X, Plus, AlertCircle, RotateCcw } from 'lucide-react';
 import { type DiscountType } from '../utils/discountCalculator';
-
-interface PricingTier {
-  firstUnit: number;
-  lastUnit: number;
-  perUnit: number;
-  flatFee: number;
-}
-
-interface PlanConfig {
-  name: string;
-  pricingTiers: PricingTier[];
-  connections: number;
-  usersPerCompany: number;
-  scorecardsPerCompany: number | 'unlimited';
-  metricsPerScorecard: number;
-  aiTokensPerDollar: number;
-  historicDataYears: number;
-  contactThreshold: number;
-  stripeProductId: string;
-  features: {
-    dailySync: boolean;
-    immediateSyncCommand: boolean;
-    billingFlexibility: boolean;
-    customBranding: boolean;
-  };
-}
-
-type PlanType = 'ai-advisor' | 'starter' | 'growth' | 'scale';
-type TabType = PlanType | 'reseller' | 'discounts' | 'royalty-processing';
+import { type PlanType, type PlanConfig, type PricingTier } from '../config/planConfigs';
+type TabType = PlanType | 'reseller' | 'discounts' | 'royalty-processing' | 'onboarding-fee';
 
 interface SettingsProps {
   planConfigs: Record<PlanType, PlanConfig>;
@@ -43,6 +16,11 @@ interface SettingsProps {
   royaltyBaseFee: number;
   royaltyPerTransaction: number;
   estimatedTransactions: number;
+  onboardingFeeAmount: number;
+  onboardingFeeTitle: string;
+  onboardingFeeDescription: string;
+  quoteStartDate: string;
+  quoteExpirationDays: number;
   onUpdatePricing: (
     configs: Record<PlanType, PlanConfig>,
     wholesaleDiscount: number,
@@ -54,7 +32,12 @@ interface SettingsProps {
     royaltyProcessingEnabled: boolean,
     royaltyBaseFee: number,
     royaltyPerTransaction: number,
-    estimatedTransactions: number
+    estimatedTransactions: number,
+    onboardingFeeAmount: number,
+    onboardingFeeTitle: string,
+    onboardingFeeDescription: string,
+    quoteStartDate: string,
+    quoteExpirationDays: number
   ) => void;
   isEmbedded?: boolean;
   terminology?: {
@@ -77,6 +60,11 @@ const Settings: React.FC<SettingsProps> = ({
   royaltyBaseFee: initialRoyaltyBaseFee,
   royaltyPerTransaction: initialRoyaltyPerTransaction,
   estimatedTransactions: initialEstimatedTransactions,
+  onboardingFeeAmount: initialOnboardingFeeAmount,
+  onboardingFeeTitle: initialOnboardingFeeTitle,
+  onboardingFeeDescription: initialOnboardingFeeDescription,
+  quoteStartDate: initialQuoteStartDate,
+  quoteExpirationDays: initialQuoteExpirationDays,
   onUpdatePricing,
   isEmbedded = false,
   terminology = { singular: 'company', plural: 'companies', capitalized: 'Companies' },
@@ -94,6 +82,11 @@ const Settings: React.FC<SettingsProps> = ({
   const [royaltyProcessingEnabled, setRoyaltyProcessingEnabled] = useState(initialRoyaltyProcessingEnabled);
   const [royaltyBaseFee, setRoyaltyBaseFee] = useState(initialRoyaltyBaseFee);
   const [estimatedTransactions, setEstimatedTransactions] = useState(initialEstimatedTransactions);
+  const [onboardingFeeAmount, setOnboardingFeeAmount] = useState(initialOnboardingFeeAmount);
+  const [onboardingFeeTitle, setOnboardingFeeTitle] = useState(initialOnboardingFeeTitle);
+  const [onboardingFeeDescription, setOnboardingFeeDescription] = useState(initialOnboardingFeeDescription);
+  const [quoteStartDate, setQuoteStartDate] = useState(initialQuoteStartDate);
+  const [quoteExpirationDays, setQuoteExpirationDays] = useState(initialQuoteExpirationDays);
 
   // Split out WorldPay fee and service fee (initialize from total if already set)
   const [worldPayFee, setWorldPayFee] = useState(() => {
@@ -131,7 +124,12 @@ const Settings: React.FC<SettingsProps> = ({
       royaltyProcessingEnabled,
       royaltyBaseFee,
       totalPerTransaction, // Use calculated total
-      estimatedTransactions
+      estimatedTransactions,
+      onboardingFeeAmount,
+      onboardingFeeTitle,
+      onboardingFeeDescription,
+      quoteStartDate,
+      quoteExpirationDays
     );
     setIsOpen(false);
   };
@@ -162,6 +160,11 @@ const Settings: React.FC<SettingsProps> = ({
       setWorldPayFee(0.32);
       setAchServiceFee(1.50);
       setEstimatedTransactions(2);
+      setOnboardingFeeAmount(0);
+      setOnboardingFeeTitle('Custom Onboarding Fee');
+      setOnboardingFeeDescription('Setup sCOA, hierarchy, benchmarking, KPI reporting and forecasting, and setup custom scorecards. This is white-glove onboarding with dedicated support to ensure your success from day one.');
+      setQuoteStartDate(new Date().toISOString().split('T')[0]);
+      setQuoteExpirationDays(14);
 
       // Optionally, you can also save the defaults immediately
       onUpdatePricing(
@@ -175,7 +178,12 @@ const Settings: React.FC<SettingsProps> = ({
         false,
         0,
         1.82,
-        2
+        2,
+        0,
+        'Custom Onboarding Fee',
+        'Setup sCOA, hierarchy, benchmarking, KPI reporting and forecasting, and setup custom scorecards. This is white-glove onboarding with dedicated support to ensure your success from day one.',
+        new Date().toISOString().split('T')[0],
+        14
       );
 
       // Keep modal open so user can see the reset took effect
@@ -302,7 +310,7 @@ const Settings: React.FC<SettingsProps> = ({
             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
         }`}
       >
-        Discounts
+        Quote & Discount
       </button>
       <button
         onClick={() => setActiveTab('royalty-processing')}
@@ -313,6 +321,16 @@ const Settings: React.FC<SettingsProps> = ({
         }`}
       >
         Royalty Processing
+      </button>
+      <button
+        onClick={() => setActiveTab('onboarding-fee')}
+        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+          activeTab === 'onboarding-fee'
+            ? 'bg-[#1239FF] text-white'
+            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+        }`}
+      >
+        Onboarding Fee
       </button>
     </div>
   );
@@ -578,10 +596,79 @@ const Settings: React.FC<SettingsProps> = ({
     );
   };
 
-  const renderDiscountsSettings = () => (
-    <div className="space-y-8">
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Custom Discount</h3>
+  const renderDiscountsSettings = () => {
+    // Calculate the expiration date based on start date + days
+    const calculateExpirationDate = () => {
+      const startDate = new Date(quoteStartDate);
+      const expirationDate = new Date(startDate);
+      expirationDate.setDate(expirationDate.getDate() + quoteExpirationDays);
+      return expirationDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    };
+
+    return (
+      <div className="space-y-8">
+        {/* Quote Validity Period Section */}
+        <div>
+          <h3 className="text-lg font-semibold mb-4">Quote Validity Period</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={quoteStartDate}
+                onChange={(e) => setQuoteStartDate(e.target.value)}
+                className="w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-[#1239FF] focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Date when the quote becomes valid
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Valid for (days)
+              </label>
+              <input
+                type="number"
+                value={quoteExpirationDays}
+                onChange={(e) => setQuoteExpirationDays(Math.max(1, Number(e.target.value)))}
+                className="w-32 rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-[#1239FF] focus:border-transparent"
+                min="1"
+                max="365"
+              />
+              <span className="ml-2 text-sm text-gray-500">days</span>
+              <p className="text-xs text-gray-500 mt-1">
+                Number of days until quote expires
+              </p>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm font-medium text-blue-900 mb-1">
+                Expiration Date: {calculateExpirationDate()}
+              </p>
+              <p className="text-xs text-blue-700">
+                Quote will expire on this date (calculated from start date + days)
+              </p>
+            </div>
+
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <p className="text-xs text-green-800">
+                <strong>💡 Best Practice:</strong> Research shows 7-14 day quotes convert 20% better than 30+ days.
+                Shorter periods create urgency without being too restrictive.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Custom Discount Section */}
+        <div>
+          <h3 className="text-lg font-semibold mb-4">Custom Discount</h3>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -700,8 +787,9 @@ const Settings: React.FC<SettingsProps> = ({
           )}
         </div>
       </div>
-    </div>
-  );
+      </div>
+    );
+  };
 
   const renderResellerSettings = () => (
     <div className="space-y-8">
@@ -778,6 +866,117 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
             </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderOnboardingFeeSettings = () => (
+    <div className="space-y-8">
+      <div>
+        <h3 className="text-lg font-semibold mb-4">Custom Onboarding Fee</h3>
+        <p className="text-sm text-gray-600 mb-6">
+          Configure a one-time onboarding fee to cover custom setup, integration, and training services.
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Fee Amount (One-time)
+            </label>
+            <div className="flex items-center">
+              <span className="text-gray-500 mr-2">$</span>
+              <input
+                type="number"
+                value={onboardingFeeAmount}
+                onChange={(e) => setOnboardingFeeAmount(Number(e.target.value))}
+                className="w-48 rounded-md border border-gray-300 px-3 py-2"
+                min="0"
+                step="100"
+                placeholder="0"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Leave at $0 to hide the onboarding fee from pricing display
+            </p>
+          </div>
+
+          {onboardingFeeAmount > 0 && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Fee Title
+                </label>
+                <input
+                  type="text"
+                  value={onboardingFeeTitle}
+                  onChange={(e) => setOnboardingFeeTitle(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  placeholder="Custom Onboarding Fee"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Display name shown to customers
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={onboardingFeeDescription}
+                  onChange={(e) => setOnboardingFeeDescription(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  rows={4}
+                  placeholder="Describe what's included in the onboarding..."
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Detailed description of onboarding services (shown as a tooltip to customers)
+                </p>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <h4 className="font-medium text-amber-900 mb-3">Preview</h4>
+                <div className="bg-white border border-amber-300 rounded-lg p-3">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-gray-900">{onboardingFeeTitle}</span>
+                        <span className="text-xs text-gray-500">(ℹ️ hover for details)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block bg-gradient-to-r from-amber-600 to-orange-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                          ONE-TIME FEE
+                        </span>
+                      </div>
+                    </div>
+                    <span className="font-bold text-lg text-amber-700">
+                      ${onboardingFeeAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  {onboardingFeeDescription && (
+                    <p className="text-xs text-gray-600 leading-relaxed border-t border-gray-200 pt-2">
+                      <strong>Description:</strong> {onboardingFeeDescription}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-900 mb-2">What to Include</h4>
+                <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                  <li>Custom chart of accounts (sCOA) setup</li>
+                  <li>Organizational hierarchy configuration</li>
+                  <li>Benchmarking and KPI reporting setup</li>
+                  <li>Forecasting model configuration</li>
+                  <li>Custom scorecard design and implementation</li>
+                  <li>White-glove onboarding with dedicated support</li>
+                  <li>Custom integrations or data migrations</li>
+                  <li>Team training and knowledge transfer</li>
+                </ul>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -962,6 +1161,7 @@ const Settings: React.FC<SettingsProps> = ({
               {activeTab === 'reseller' ? renderResellerSettings() :
                activeTab === 'discounts' ? renderDiscountsSettings() :
                activeTab === 'royalty-processing' ? renderRoyaltyProcessingSettings() :
+               activeTab === 'onboarding-fee' ? renderOnboardingFeeSettings() :
                renderPlanSettings(activeTab as PlanType)}
             </div>
 

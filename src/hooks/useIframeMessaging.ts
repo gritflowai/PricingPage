@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 
 export interface PricingSelectionData {
   selectedPlan: string;
@@ -44,14 +44,52 @@ export interface PricingSelectionData {
   };
 }
 
+// Quote-related message types
+export interface QuoteMessageData {
+  id: string;
+  version?: number;
+  pricingModelId?: string | null;
+  status?: 'draft' | 'locked' | 'accepted' | 'expired';
+  expiresAt?: string | null;
+  lockedAt?: string | null;
+  selectedPlan?: string;
+  count?: number;
+  isAnnual?: boolean;
+  currency?: string;
+  priceBreakdown?: any;
+  planDetails?: any;
+  selectionRaw?: any;
+  expiresInDays?: number;
+  acceptedAt?: string;
+  payload?: any;
+}
+
+export interface QuoteErrorData {
+  error: string;
+  code?: 'EXPIRED' | 'NOT_FOUND' | 'VALIDATION_ERROR' | 'NETWORK_ERROR' | 'UNKNOWN';
+  details?: any;
+}
+
 export interface IframeMessage {
-  type: 'PRICING_SELECTION_UPDATE' | 'USER_ACTION' | 'IFRAME_READY' | 'ENTERPRISE_INQUIRY';
+  type: 'PRICING_SELECTION_UPDATE' | 'USER_ACTION' | 'IFRAME_READY' | 'ENTERPRISE_INQUIRY'
+    | 'QUOTE_ID_READY' | 'QUOTE_SUMMARY_UPDATE' | 'QUOTE_LOCKED' | 'QUOTE_ACCEPT_INTENT'
+    | 'QUOTE_ACCEPTED' | 'QUOTE_ERROR';
   data?: PricingSelectionData | {
     action: 'START_FREE_TRIAL' | 'CONTACT_SALES' | 'SCHEDULE_MEETING';
     selections: Partial<PricingSelectionData>;
   } | {
     count: number;
     planName: string;
+  } | QuoteMessageData | QuoteErrorData;
+}
+
+// Incoming message types from parent window
+export interface IncomingMessage {
+  type: 'CONFIRM_QUOTE_ACCEPTANCE' | 'SET_ADMIN_MODE';
+  data?: {
+    id?: string;
+    acceptedAt?: string;
+    enabled?: boolean;
   };
 }
 
@@ -64,6 +102,7 @@ export const useIframeMessaging = (options: UseIframeMessagingOptions = {}) => {
   const { enabled = true, debounceMs = 300 } = options;
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isInIframeRef = useRef<boolean>(false);
+  const [incomingMessage, setIncomingMessage] = useState<IncomingMessage | null>(null);
 
   // Detect if running in iframe
   useEffect(() => {
@@ -74,20 +113,39 @@ export const useIframeMessaging = (options: UseIframeMessagingOptions = {}) => {
       isInIframeRef.current = true;
     }
 
+    const isInIframe = isInIframeRef.current;
+    console.log('[PricingCalculator] Iframe detection:', {
+      isInIframe,
+      enabled,
+      timestamp: new Date().toISOString()
+    });
+
     // Send ready message when component mounts
-    if (isInIframeRef.current && enabled) {
+    if (isInIframe && enabled) {
       sendMessage({ type: 'IFRAME_READY' });
     }
   }, [enabled]);
 
   const sendMessage = useCallback((message: IframeMessage) => {
-    if (!enabled || !isInIframeRef.current) return;
+    if (!enabled || !isInIframeRef.current) {
+      console.log('[PricingCalculator] Message not sent (disabled or not in iframe):', message.type);
+      return;
+    }
 
     try {
       // Send to parent window
       window.parent.postMessage(message, '*');
+      console.log('[PricingCalculator] Sent postMessage:', {
+        type: message.type,
+        timestamp: new Date().toISOString(),
+        data: message.data
+      });
     } catch (e) {
-      console.error('Failed to send postMessage:', e);
+      console.error('[PricingCalculator] Failed to send postMessage:', {
+        type: message.type,
+        error: e,
+        timestamp: new Date().toISOString()
+      });
     }
   }, [enabled]);
 
@@ -135,6 +193,36 @@ export const useIframeMessaging = (options: UseIframeMessagingOptions = {}) => {
     });
   }, [enabled, sendMessage]);
 
+  // Listen for incoming messages from parent window
+  useEffect(() => {
+    if (!enabled || !isInIframeRef.current) return;
+
+    const handleIncomingMessage = (event: MessageEvent) => {
+      // Basic validation - in production, validate event.origin
+      if (!event.data || !event.data.type) return;
+
+      console.log('[PricingCalculator] Received message from parent:', {
+        type: event.data.type,
+        origin: event.origin,
+        timestamp: new Date().toISOString(),
+        data: event.data
+      });
+
+      // Handle known incoming message types
+      if (event.data.type === 'CONFIRM_QUOTE_ACCEPTANCE' || event.data.type === 'SET_ADMIN_MODE') {
+        setIncomingMessage(event.data as IncomingMessage);
+      }
+    };
+
+    window.addEventListener('message', handleIncomingMessage);
+    console.log('[PricingCalculator] Message listener registered');
+
+    return () => {
+      window.removeEventListener('message', handleIncomingMessage);
+      console.log('[PricingCalculator] Message listener unregistered');
+    };
+  }, [enabled]);
+
   // Cleanup debounce timer on unmount
   useEffect(() => {
     return () => {
@@ -144,11 +232,30 @@ export const useIframeMessaging = (options: UseIframeMessagingOptions = {}) => {
     };
   }, []);
 
+  // Helper function for sending quote messages
+  const sendQuoteMessage = useCallback((
+    type: 'QUOTE_ID_READY' | 'QUOTE_SUMMARY_UPDATE' | 'QUOTE_LOCKED' | 'QUOTE_ACCEPT_INTENT' | 'QUOTE_ACCEPTED',
+    data: QuoteMessageData
+  ) => {
+    sendMessage({ type, data });
+  }, [sendMessage]);
+
+  // Helper function for sending quote errors
+  const sendQuoteError = useCallback((error: string, code?: QuoteErrorData['code'], details?: any) => {
+    sendMessage({
+      type: 'QUOTE_ERROR',
+      data: { error, code, details }
+    });
+  }, [sendMessage]);
+
   return {
     isInIframe: isInIframeRef.current,
     sendSelectionUpdate,
     sendUserAction,
     sendEnterpriseInquiry,
     sendMessage,
+    sendQuoteMessage,
+    sendQuoteError,
+    incomingMessage,
   };
 };

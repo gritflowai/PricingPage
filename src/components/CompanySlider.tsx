@@ -18,6 +18,7 @@ interface CompanySliderProps {
   contactThreshold?: number;
   onExceedThreshold?: () => void;
   disabled?: boolean;
+  adminMode?: boolean;
 }
 
 const CompanySlider: React.FC<CompanySliderProps> = ({
@@ -30,6 +31,7 @@ const CompanySlider: React.FC<CompanySliderProps> = ({
   contactThreshold,
   onExceedThreshold,
   disabled = false,
+  adminMode = false,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(companies.toString());
@@ -118,6 +120,11 @@ const CompanySlider: React.FC<CompanySliderProps> = ({
   // Calculate slider percentage for gradient
   const sliderPercent = ((companies - minCompanies) / (maxCompanies - minCompanies)) * 100;
 
+  // Determine display value: show "50+" for non-admins over threshold
+  const displayValue = (!adminMode && contactThreshold && companies >= contactThreshold)
+    ? `${contactThreshold}+`
+    : companies.toString();
+
   return (
     <div className="bg-white rounded-lg p-6">
       <h3 className="text-xl font-semibold text-center text-[#180D43] mb-8">
@@ -142,7 +149,7 @@ const CompanySlider: React.FC<CompanySliderProps> = ({
               onClick={() => setIsEditing(true)}
               className="bg-[#1239FF] text-white px-4 py-2 rounded-full text-lg font-bold cursor-pointer hover:bg-[#1239FF]/90 smooth-transition glow-blue hover:glow-blue-strong"
             >
-              {companies}
+              {displayValue}
             </div>
           )}
         </div>

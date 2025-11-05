@@ -195,7 +195,26 @@ Update draft quote calculations (called on debounced slider changes).
     "selection_raw": {
       "selectedPlan": "growth",
       "count": 25,
-      "isAnnual": true
+      "isAnnual": true,
+      "customDiscount": {
+        "type": "percentage",
+        "value": 15,
+        "label": "Early Adopter",
+        "reason": "Q1 promo",
+        "discountAmount": 250.00
+      },
+      "royaltyProcessing": {
+        "enabled": true,
+        "baseFee": 0,
+        "perTransaction": 1.82,
+        "estimatedTransactions": 2,
+        "totalFee": 91.00
+      },
+      "onboardingFee": {
+        "amount": 5000,
+        "title": "White-Glove Onboarding",
+        "description": "Setup sCOA, hierarchy, benchmarking, KPI reporting and forecasting..."
+      }
     }
   }
 }
@@ -429,11 +448,105 @@ const loadResponse = await fetch(
 const existingQuote = await loadResponse.json();
 ```
 
+## Admin Mode for Salespeople
+
+### Overview
+
+The pricing calculator supports an **Admin Mode** (`isAdmin`) that provides extended capabilities for salespeople and administrators. This mode removes UI restrictions and allows configuration of high-volume quotes.
+
+### Admin Mode Properties
+
+When `isAdmin` is enabled (via URL parameter `?admin=true` or iframe message), the following changes apply:
+
+| Feature | Regular User | Admin User (`isAdmin=true`) |
+|---------|--------------|----------------------------|
+| **Max Locations** | 50 | 500 |
+| **Settings Access** | Hidden (always) | Visible (always) |
+| **Contact Modal** | Auto-triggers at 50+ | Disabled |
+| **Count Display** | Shows "50+" when over threshold | Shows exact count (e.g., "87") |
+| **Quote Configuration** | Limited to threshold | Full control up to 500 |
+
+**Note**: Settings button is ONLY visible when `admin=true`. Hidden in all other cases (including quote mode).
+
+### Enabling Admin Mode
+
+**Option 1: URL Parameter**
+```
+?admin=true
+```
+
+**Option 2: Iframe Message** (see EMBEDDING.md for details)
+```javascript
+iframe.contentWindow.postMessage({
+  type: 'SET_ADMIN_MODE',
+  data: { enabled: true }
+}, '*');
+```
+
+### Use Cases
+
+1. **Sales Quote Creation**: Salespeople creating custom quotes for enterprise customers with 50-500 locations
+2. **Internal Pricing Tools**: Admin dashboards that need full access to pricing configuration
+3. **Demo/Testing**: Internal teams testing high-volume scenarios
+
+### Security Considerations
+
+⚠️ **IMPORTANT**: Admin mode is a **presentation-level feature**, NOT a security control.
+
+- ✅ Safe for internal sales portals with authentication
+- ✅ Can be used in authenticated iframe embeds
+- ❌ Does NOT provide server-side access control
+- ❌ Should NOT be exposed to untrusted users
+- ❌ Does NOT validate user permissions on the backend
+
+**Best Practice**: Only enable admin mode in authenticated contexts where you control access to the calculator URL.
+
+### Integration with Quote System
+
+Admin mode works seamlessly with the quote system:
+
+1. **Draft Creation**: Admin can configure quotes with 1-500 locations
+2. **Lock Quote**: Quote is locked with current pricing (up to 500 locations)
+3. **Share Quote**: Customer receives locked quote URL without admin privileges
+4. **Customer View**: Customer sees locked pricing but cannot edit or access Settings
+
+**Example Workflow:**
+```bash
+# Salesperson creates quote with 125 locations
+GET https://your-url.com?mode=quote&admin=true&count=125&plan=growth
+
+# Quote is locked and shared with customer
+GET https://your-url.com?mode=quote&id=550e8400-e29b-41d4-a716-446655440000
+
+# Customer sees locked quote without admin access
+# - Settings hidden
+# - Controls disabled
+# - Pricing frozen
+```
+
+### API Considerations
+
+The API endpoints **do not enforce** admin mode restrictions. The database will accept quotes with any location count (up to the `count` field's limit).
+
+Admin mode only affects:
+- ✅ Frontend UI/UX (max slider value, Settings visibility)
+- ✅ Client-side validations (ContactModal trigger)
+- ❌ API validations (backend accepts any valid count)
+- ❌ Database constraints (no special admin-only records)
+
+If you need server-side admin restrictions, implement authentication and authorization in your API layer.
+
+## Additional Documentation
+
+- **[QUOTE_SETTINGS.md](./QUOTE_SETTINGS.md)** - Complete guide for quote settings sync including test cases and URL examples
+- **[EMBEDDING.md](./EMBEDDING.md)** - Iframe embedding and PostMessage API documentation (includes Admin Mode details)
+- **[QUICKSTART.md](./QUICKSTART.md)** - Quick start guide for local development
+
 ## Next Steps
 
-1. Integrate these endpoints into the React frontend
-2. Add quote mode detection in App.tsx
-3. Implement debounced quote updates on slider changes
-4. Add "Lock Pricing" button to UI
-5. Implement quote sharing (URL with quote ID)
+1. ✅ Integrate these endpoints into the React frontend
+2. ✅ Add quote mode detection in App.tsx
+3. ✅ Implement debounced quote updates on slider changes
+4. ✅ Add "Lock Pricing" button to UI
+5. ✅ Implement quote sharing (URL with quote ID)
 6. Add authentication and restrict RLS policies

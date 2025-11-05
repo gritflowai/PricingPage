@@ -7,7 +7,12 @@
       "Bash(dir /b \"c:\\repos\\PricingPage\")",
       "Bash(dir /s /b \"c:\\repos\\PricingPage\")",
       "Bash(findstr:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm start)",
+      "Bash(timeout 5 bash:*)",
+      "Bash(npx update-browserslist-db@latest:*)",
+      "Bash(timeout 3 bash:*)"
     ],
     "deny": [],
     "ask": []
