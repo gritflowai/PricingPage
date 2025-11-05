@@ -93,9 +93,14 @@ const PricingCalculator: React.FC<PricingCalculatorProps> = ({
                     {isAnnual ? 'Billed annually' : 'Billed monthly'}
                   </p>
                 </div>
-                <button className="w-full mt-4 bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors duration-200">
+                <a
+                  href="https://auth.autymate.com/Register"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full mt-4 bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors duration-200 block text-center"
+                >
                   Start your free trial
-                </button>
+                </a>
               </div>
             </div>
           </div>

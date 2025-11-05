@@ -13,9 +13,14 @@ const CallToAction: React.FC = () => {
           No credit card required to start your 14-day free trial.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button className="bg-white text-indigo-900 px-8 py-3 rounded-lg font-medium hover:bg-gray-100 transition-colors flex items-center justify-center">
+          <a
+            href="https://auth.autymate.com/Register"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white text-indigo-900 px-8 py-3 rounded-lg font-medium hover:bg-gray-100 transition-colors flex items-center justify-center"
+          >
             Start your free trial <ArrowRight className="ml-2 w-4 h-4" />
-          </button>
+          </a>
           <button className="bg-transparent border border-indigo-300 text-white px-8 py-3 rounded-lg font-medium hover:bg-indigo-800 transition-colors">
             Schedule a demo
           </button>
