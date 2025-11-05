@@ -1350,7 +1350,10 @@ function App() {
                       </p>
                     </div>
 
-                    <button
+                    <a
+                      href="https://auth.autymate.com/Register"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       onClick={() => {
                         sendUserAction('START_FREE_TRIAL', {
                           userType,
@@ -1376,10 +1379,10 @@ function App() {
                           },
                         });
                       }}
-                      className="w-full bg-[#FF6B35] text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-[#FF5722] smooth-transition transform hover:scale-[1.02] shadow-lg hover:shadow-xl"
+                      className="w-full bg-[#FF6B35] text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-[#FF5722] smooth-transition transform hover:scale-[1.02] shadow-lg hover:shadow-xl block text-center"
                     >
                       Start Free Trial — No Credit Card
-                    </button>
+                    </a>
 
                     {/* Trust Badges & Reviews - Below Button */}
                     <div className="mt-3 space-y-2">
