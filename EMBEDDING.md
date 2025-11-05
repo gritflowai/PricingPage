@@ -151,6 +151,9 @@ Sent whenever user changes selections (debounced 300ms for sliders).
 {
   type: 'PRICING_SELECTION_UPDATE',
   data: {
+    // User information
+    userType: 'franchisee',            // User's role: 'cpa', 'franchisee', or 'smb'
+
     // Selected configuration
     selectedPlan: 'growth',           // Plan type: ai-advisor, starter, growth, scale
     count: 25,                         // Number of companies or users
@@ -207,6 +210,17 @@ Sent whenever user changes selections (debounced 300ms for sliders).
 }
 ```
 
+**User Type Values:**
+- `'cpa'` - CPA/Accountant: User refers to items as "clients"
+- `'franchisee'` - Franchisee/ZOR: User refers to items as "locations"
+- `'smb'` - Small Business Owner: User refers to items as "companies"
+
+The `userType` field helps you understand the user's perspective and terminology preferences, enabling you to:
+- Customize messaging based on their role (e.g., "Perfect for accounting firms" vs "Great for franchise brands")
+- Track which user segments are interested in which plans
+- Tailor follow-up communications to their industry
+- Use appropriate terminology in your UI ("clients" vs "locations" vs "companies")
+
 ### 3. USER_ACTION
 Sent when user clicks action buttons (Start Free Trial, Contact Sales, Schedule Meeting).
 
@@ -217,6 +231,7 @@ Sent when user clicks action buttons (Start Free Trial, Contact Sales, Schedule 
     action: 'START_FREE_TRIAL',  // or 'CONTACT_SALES' or 'SCHEDULE_MEETING'
     selections: {
       // Same structure as PRICING_SELECTION_UPDATE data
+      userType: 'franchisee',    // User's role: 'cpa', 'franchisee', or 'smb'
       selectedPlan: 'growth',
       count: 25,
       isAnnual: true,
@@ -1009,6 +1024,13 @@ When locked, all controls (sliders, plan selectors, toggles) are disabled.
 - **[QUICKSTART.md](./QUICKSTART.md)** - Quick start guide for local development
 
 ## Change Log
+
+### Version 2.4.0 (2025-11-04)
+- **NEW: User Type Field** - `userType` field added to `PRICING_SELECTION_UPDATE` and `USER_ACTION` messages
+- **NEW: Role Tracking** - Track whether user is CPA, Franchisee, or Small Business Owner
+- **IMPROVED: Analytics** - Better understanding of pricing patterns by user segment
+- **IMPROVED: Customization** - Parent apps can show role-appropriate messaging based on userType
+- **IMPROVED: Terminology Sync** - Parent knows user's preferred terminology (clients/locations/companies)
 
 ### Version 2.3.0 (2025-11-04)
 - **NEW: Admin Mode** - Special mode for salespeople with extended capabilities

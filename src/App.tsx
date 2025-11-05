@@ -7,7 +7,7 @@ import Tooltip from './components/Tooltip';
 import RoleSelector from './components/RoleSelector';
 import FeatureComparison from './components/FeatureComparison';
 import { QuoteModeBanner } from './components/QuoteModeBanner';
-import { AlertCircle, ChevronDown, Shield, CreditCard, RefreshCw } from 'lucide-react';
+import { AlertCircle, ChevronDown, Shield, CreditCard, RefreshCw, Copy, BarChart3 } from 'lucide-react';
 import { useIframeMessaging } from './hooks/useIframeMessaging';
 import { calculateCustomDiscount, type DiscountType } from './utils/discountCalculator';
 import { useQuoteMode } from './hooks/useQuoteMode';
@@ -84,6 +84,13 @@ function getEmbedConfig() {
     discountLabel = params.get('discountLabel') || '';
   }
 
+  // Parse userType parameter
+  const userTypeParam = params.get('userType');
+  let initialUserType: UserType | null = null;
+  if (userTypeParam === 'cpa' || userTypeParam === 'franchisee' || userTypeParam === 'smb') {
+    initialUserType = userTypeParam;
+  }
+
   return {
     isEmbedded: params.get('embedded') === 'true',
     theme: params.get('theme') || 'default',
@@ -106,6 +113,8 @@ function getEmbedConfig() {
     mode: params.get('mode') || 'calculator',
     quoteId: params.get('id') || null,
     expiresInDays: parseInt(params.get('quoteExpiresInDays') || '14', 10),
+    // User type parameter
+    initialUserType,
   };
 }
 
@@ -211,7 +220,7 @@ function App() {
   // Load saved settings
   const savedSettings = loadSavedSettings();
 
-  const [userType, setUserType] = useState<UserType>('franchisee'); // Default to franchisee (target market)
+  const [userType, setUserType] = useState<UserType>(embedConfig.initialUserType ?? 'franchisee'); // Default to franchisee (target market)
   const [isAnnual, setIsAnnual] = useState(embedConfig.initialIsAnnual ?? true);
   const [count, setCount] = useState(embedConfig.initialCount ?? 10);
   const [selectedPlan, setSelectedPlan] = useState<PlanType>(embedConfig.initialPlan ?? 'starter');
@@ -476,8 +485,9 @@ function App() {
 
   // Send selection updates whenever pricing-related state changes
   useEffect(() => {
-    if (count < currentPlan.contactThreshold || isLocked) {
+    if (count < currentPlan.contactThreshold || isLocked || adminMode) {
       sendSelectionUpdate({
+        userType,
         selectedPlan,
         count,
         isAnnual,
@@ -524,6 +534,7 @@ function App() {
       });
     }
   }, [
+    userType,
     selectedPlan,
     count,
     isAnnual,
@@ -550,6 +561,7 @@ function App() {
     calculatedAiTokens,
     sendSelectionUpdate,
     isLocked,
+    adminMode,
   ]);
 
   // Debounced quote updates (only in draft mode)
@@ -1108,8 +1120,8 @@ function App() {
             </div>
           </div>
 
-          {/* Only show Price Summary when below enterprise threshold or quote is locked */}
-          {(count < currentPlan.contactThreshold || isLocked) && (
+          {/* Only show Price Summary when below enterprise threshold, quote is locked, or admin mode */}
+          {(count < currentPlan.contactThreshold || isLocked || adminMode) && (
             <div className="bg-white rounded-lg shadow-sm border border-[#1239FF]/10 overflow-hidden">
               <div className="bg-[#1239FF] text-white p-2">
                 <h2 className="text-sm font-semibold">Price Summary</h2>
@@ -1158,15 +1170,17 @@ function App() {
                         <div className="mt-3 flex gap-3">
                           <button
                             onClick={handleCopyShareLink}
-                            className="flex-1 border border-gray-300 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                            className="flex-1 border border-gray-300 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
                           >
-                            📋 Copy Quote Link
+                            <Copy className="w-4 h-4" />
+                            Copy Quote Link
                           </button>
                           <button
                             onClick={() => setShowPricingDetails(!showPricingDetails)}
-                            className="flex-1 border border-gray-300 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                            className="flex-1 border border-gray-300 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
                           >
-                            📊 View Details
+                            <BarChart3 className="w-4 h-4" />
+                            View Details
                           </button>
                         </div>
                       </>
@@ -1187,9 +1201,17 @@ function App() {
                 ) : (
                   // Calculator Mode Button
                   <>
+                    {/* Social Proof */}
+                    <div className="mb-3 text-center">
+                      <p className="text-sm text-gray-600">
+                        <span className="text-[#1239FF] font-semibold">Join 3,500+ customers</span> from franchisor, SMB to enterprises
+                      </p>
+                    </div>
+
                     <button
                       onClick={() => {
                         sendUserAction('START_FREE_TRIAL', {
+                          userType,
                           selectedPlan,
                           count,
                           isAnnual,
@@ -1214,11 +1236,11 @@ function App() {
                       }}
                       className="w-full bg-[#1239FF] text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-[#1239FF]/90 smooth-transition transform hover:scale-[1.02] glow-blue hover:glow-blue-strong"
                     >
-                      Start Your Free Trial
+                      Start Free Trial — No Credit Card
                     </button>
 
                     {/* Trust Indicators - Only in Calculator Mode */}
-                    <div className="flex justify-center gap-4 mt-3 text-xs text-[#180D43]/60">
+                    <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-3 text-xs text-[#180D43]/60">
                       <span className="flex items-center gap-1">
                         <CreditCard className="w-3 h-3" />
                         No credit card required
@@ -1230,6 +1252,18 @@ function App() {
                       <span className="flex items-center gap-1">
                         <Shield className="w-3 h-3" />
                         7-day free trial
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Shield className="w-3 h-3" />
+                        30-day money-back guarantee
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Shield className="w-3 h-3" />
+                        SOC 2 Type 1 certified
+                      </span>
+                      <span className="flex items-center gap-1">
+                        🔒
+                        SSL secure checkout
                       </span>
                     </div>
 
@@ -1599,6 +1633,7 @@ function App() {
         unitLabel={selectedPlan === 'ai-advisor' ? 'users' : terminology.plural}
         onUserAction={(action) => {
           sendUserAction(action, {
+            userType,
             selectedPlan,
             count,
             isAnnual,

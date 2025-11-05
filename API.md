@@ -193,6 +193,7 @@ Update draft quote calculations (called on debounced slider changes).
       "aiTokens": 125000
     },
     "selection_raw": {
+      "userType": "franchisee",
       "selectedPlan": "growth",
       "count": 25,
       "isAnnual": true,
@@ -453,6 +454,39 @@ const existingQuote = await loadResponse.json();
 ### Overview
 
 The pricing calculator supports an **Admin Mode** (`isAdmin`) that provides extended capabilities for salespeople and administrators. This mode removes UI restrictions and allows configuration of high-volume quotes.
+
+### URL Parameters
+
+The calculator supports various URL parameters for configuration:
+
+| Parameter | Type | Values | Description | Example |
+|-----------|------|--------|-------------|---------|
+| `userType` | string | `cpa`, `franchisee`, `smb` | User's role (affects terminology and postMessage data) | `?userType=cpa` |
+| `plan` | string | `starter`, `growth`, `scale`, `ai-advisor` | Pre-select a plan | `?plan=growth` |
+| `count` | number | 1-500 | Pre-select location/client count | `?count=25` |
+| `annual` | boolean | `true`, `false` | Pre-select billing cycle | `?annual=true` |
+| `admin` | boolean | `true`, `false` | Enable admin mode | `?admin=true` |
+| `mode` | string | `calculator`, `quote` | Operating mode | `?mode=quote` |
+| `id` | string | UUID | Load existing quote | `?id=550e8400-e29b-41d4...` |
+
+**User Type Values:**
+- `cpa` - CPA/Accountant (uses "client" terminology)
+- `franchisee` - Franchisee/ZOR (uses "location" terminology, default)
+- `smb` - Small Business Owner (uses "company" terminology)
+
+The `userType` parameter is included in all postMessage events sent to the parent window (see [EMBEDDING.md](./EMBEDDING.md) for details).
+
+**Example URLs:**
+```
+# CPA with 50 clients on Growth plan (annual)
+?userType=cpa&plan=growth&count=50&annual=true
+
+# Small business with 10 companies on Starter plan (monthly)
+?userType=smb&plan=starter&count=10&annual=false
+
+# Franchisee admin creating a quote
+?userType=franchisee&admin=true&mode=quote&plan=scale&count=125
+```
 
 ### Admin Mode Properties
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 
 export interface PricingSelectionData {
+  userType: 'cpa' | 'franchisee' | 'smb';
   selectedPlan: string;
   count: number;
   isAnnual: boolean;
