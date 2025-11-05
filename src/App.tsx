@@ -117,6 +117,8 @@ function getEmbedConfig() {
     initialOnboardingFeeAmount: params.has('onboardingFee') ? parseFloat(params.get('onboardingFee')!) : null,
     initialOnboardingFeeTitle: params.get('onboardingTitle') || null,
     initialOnboardingFeeDescription: params.get('onboardingDesc') || null,
+    // Projected locations parameter
+    projectedLocations: params.has('projectedLocations') ? parseInt(params.get('projectedLocations')!, 10) : null,
     // Quote mode parameters
     mode: params.get('mode') || 'calculator',
     quoteId: params.get('id') || null,
@@ -144,6 +146,9 @@ function loadSavedSettings(): {
   onboardingFeeDescription: string;
   quoteStartDate: string;
   quoteExpirationDays: number;
+  customTermsEnabled: boolean;
+  customTermsTitle: string;
+  customTermsContent: string;
 } {
   try {
     const saved = localStorage.getItem('pricingSettings');
@@ -179,7 +184,10 @@ function loadSavedSettings(): {
         onboardingFeeTitle: parsed.onboardingFeeTitle || 'Custom Onboarding Fee',
         onboardingFeeDescription: parsed.onboardingFeeDescription || 'Setup sCOA, hierarchy, benchmarking, KPI reporting and forecasting, and setup custom scorecards. This is white-glove onboarding with dedicated support to ensure your success from day one.',
         quoteStartDate: parsed.quoteStartDate || new Date().toISOString().split('T')[0],
-        quoteExpirationDays: parsed.quoteExpirationDays ?? 14
+        quoteExpirationDays: parsed.quoteExpirationDays ?? 14,
+        customTermsEnabled: parsed.customTermsEnabled ?? false,
+        customTermsTitle: parsed.customTermsTitle || 'Custom Terms & Conditions',
+        customTermsContent: parsed.customTermsContent || ''
       };
     }
   } catch (error) {
@@ -201,7 +209,10 @@ function loadSavedSettings(): {
     onboardingFeeTitle: 'Custom Onboarding Fee',
     onboardingFeeDescription: 'Setup sCOA, hierarchy, benchmarking, KPI reporting and forecasting, and setup custom scorecards. This is white-glove onboarding with dedicated support to ensure your success from day one.',
     quoteStartDate: new Date().toISOString().split('T')[0],
-    quoteExpirationDays: 14
+    quoteExpirationDays: 14,
+    customTermsEnabled: false,
+    customTermsTitle: 'Custom Terms & Conditions',
+    customTermsContent: ''
   };
 }
 
@@ -231,6 +242,7 @@ function App() {
   const [userType, setUserType] = useState<UserType>(embedConfig.initialUserType ?? 'franchisee'); // Default to franchisee (target market)
   const [isAnnual, setIsAnnual] = useState(embedConfig.initialIsAnnual ?? true);
   const [count, setCount] = useState(embedConfig.initialCount ?? 10);
+  const [projectedLocations, setProjectedLocations] = useState<number | null>(embedConfig.projectedLocations ?? null);
   const [selectedPlan, setSelectedPlan] = useState<PlanType>(embedConfig.initialPlan ?? 'starter');
   const [planConfigs, setPlanConfigs] = useState<Record<PlanType, PlanConfig>>(savedSettings.planConfigs);
   const [wholesaleDiscount, setWholesaleDiscount] = useState(savedSettings.wholesaleDiscount);
@@ -274,6 +286,17 @@ function App() {
   );
   const [onboardingFeeDescription, setOnboardingFeeDescription] = useState(
     embedConfig.initialOnboardingFeeDescription ?? savedSettings.onboardingFeeDescription
+  );
+
+  // Custom Terms & SOW state
+  const [customTermsEnabled, setCustomTermsEnabled] = useState(
+    savedSettings.customTermsEnabled ?? false
+  );
+  const [customTermsTitle, setCustomTermsTitle] = useState(
+    savedSettings.customTermsTitle ?? 'Custom Terms & Conditions'
+  );
+  const [customTermsContent, setCustomTermsContent] = useState(
+    savedSettings.customTermsContent ?? ''
   );
 
   // Quote mode state
@@ -372,6 +395,41 @@ function App() {
 
   // Calculate volume savings for current tier
   const volumeSavingsPercent = calculateVolumeSavings(count, currentTierIndex, currentPlan.pricingTiers);
+
+  // Calculate projected pricing (if projectedLocations is set)
+  const calculateProjectedPrice = (projectedCount: number) => {
+    if (!projectedCount || projectedCount <= 0) return 0;
+
+    // Use same calculation flow as current pricing
+    const projectedBasePrice = calculateBasePrice(projectedCount, currentPlan.pricingTiers);
+    const projectedTotalPrice = projectedBasePrice.total;
+
+    // Apply custom discount
+    const projectedCustomDiscountAmount = calculateCustomDiscount(
+      projectedTotalPrice,
+      customDiscountType,
+      customDiscountValue
+    );
+
+    // Apply wholesale discount (only for non-annual pricing, mutually exclusive with custom)
+    const projectedWholesaleDiscountAmount = !isAnnual && wholesaleDiscount > 0 && projectedCustomDiscountAmount === 0
+      ? projectedTotalPrice * (wholesaleDiscount / 100)
+      : 0;
+
+    const projectedPriceAfterDiscounts = projectedTotalPrice - projectedCustomDiscountAmount - projectedWholesaleDiscountAmount;
+    const projectedFinalPrice = isAnnual ? projectedPriceAfterDiscounts * (10/12) : projectedPriceAfterDiscounts;
+
+    // Apply royalty processing fees (if enabled)
+    const projectedRoyaltyFee = royaltyProcessingEnabled
+      ? (royaltyBaseFee * projectedCount) + (royaltyPerTransaction * estimatedTransactions * projectedCount)
+      : 0;
+
+    return projectedFinalPrice + projectedRoyaltyFee;
+  };
+
+  const projectedPrice = projectedLocations ? calculateProjectedPrice(projectedLocations) : null;
+  const projectedPricePerUnit = projectedPrice && projectedLocations ? projectedPrice / projectedLocations : null;
+  const savingsPerUnit = projectedPricePerUnit ? pricePerUnit - projectedPricePerUnit : null;
 
   // Determine if controls should be disabled (locked, accepted, or expired)
   const isLocked = quoteMode && (quoteStatus === 'locked' || quoteStatus === 'accepted' || quoteStatus === 'expired');
@@ -513,6 +571,9 @@ function App() {
         resellerCommissionAmount,
         wholesaleDiscount,
         resellerCommission,
+        projectedLocations: projectedLocations,
+        projectedPrice: projectedPrice,
+        projectedPricePerUnit: projectedPricePerUnit,
         customDiscount: customDiscountAmount > 0 && customDiscountType ? {
           type: customDiscountType,
           value: customDiscountValue,
@@ -561,6 +622,9 @@ function App() {
     resellerCommissionAmount,
     wholesaleDiscount,
     resellerCommission,
+    projectedLocations,
+    projectedPrice,
+    projectedPricePerUnit,
     customDiscountType,
     customDiscountValue,
     customDiscountLabel,
@@ -629,6 +693,11 @@ function App() {
               amount: onboardingFeeAmount,
               title: onboardingFeeTitle,
               description: onboardingFeeDescription,
+            } : null,
+            customTerms: customTermsEnabled && customTermsContent ? {
+              enabled: true,
+              title: customTermsTitle,
+              content: customTermsContent,
             } : null,
           },
         };
@@ -776,7 +845,10 @@ function App() {
     newOnboardingFeeTitle: string,
     newOnboardingFeeDescription: string,
     newQuoteStartDate: string,
-    newQuoteExpirationDays: number
+    newQuoteExpirationDays: number,
+    newCustomTermsEnabled: boolean,
+    newCustomTermsTitle: string,
+    newCustomTermsContent: string
   ) => {
     setPlanConfigs(updatedConfigs);
     setWholesaleDiscount(newWholesaleDiscount);
@@ -794,6 +866,9 @@ function App() {
     setOnboardingFeeDescription(newOnboardingFeeDescription);
     setQuoteStartDate(newQuoteStartDate);
     setQuoteExpirationDays(newQuoteExpirationDays);
+    setCustomTermsEnabled(newCustomTermsEnabled);
+    setCustomTermsTitle(newCustomTermsTitle);
+    setCustomTermsContent(newCustomTermsContent);
 
     // Save to localStorage
     try {
@@ -813,7 +888,10 @@ function App() {
         onboardingFeeTitle: newOnboardingFeeTitle,
         onboardingFeeDescription: newOnboardingFeeDescription,
         quoteStartDate: newQuoteStartDate,
-        quoteExpirationDays: newQuoteExpirationDays
+        quoteExpirationDays: newQuoteExpirationDays,
+        customTermsEnabled: newCustomTermsEnabled,
+        customTermsTitle: newCustomTermsTitle,
+        customTermsContent: newCustomTermsContent
       }));
     } catch (error) {
       console.error('Failed to save settings:', error);
@@ -924,7 +1002,9 @@ function App() {
     if (!quoteId) return;
 
     // Generate the form URL with quoteId as uid parameter and step=pricing to navigate directly to pricing step
-    const formUrl = `https://www.auty.io/?uid=${quoteId}&step=pricing`;
+    // Use the current domain instead of hardcoded URL
+    const baseUrl = window.location.origin;
+    const formUrl = `${baseUrl}/?uid=${quoteId}&step=pricing`;
 
     // Open in new tab
     window.open(formUrl, '_blank');
@@ -1657,10 +1737,78 @@ function App() {
                           </div>
                         </div>
                       )}
+
+                      {/* Custom Terms Section */}
+                      {customTermsEnabled && customTermsContent && (
+                        <div className="border-t border-gray-200 pt-2 mt-2">
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                            <div className="flex items-start gap-2 mb-2">
+                              <span className="text-blue-600 text-lg">📋</span>
+                              <div className="flex-1">
+                                <h4 className="font-medium text-blue-900">{customTermsTitle}</h4>
+                              </div>
+                            </div>
+                            <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed border-t border-blue-200 pt-2 pl-7">
+                              {customTermsContent}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
+
+              {/* Projected Pricing Display - Only show if projectedLocations is set */}
+              {projectedLocations && projectedLocations > 0 && projectedPrice && (
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-2xl">📊</span>
+                      <h3 className="text-sm font-semibold text-blue-900">
+                        Projected Pricing at {projectedLocations.toLocaleString()} {selectedPlan === 'ai-advisor' ? (projectedLocations === 1 ? 'user' : 'users') : (projectedLocations === 1 ? terminology.singular : terminology.plural)}
+                      </h3>
+                    </div>
+
+                    <div className="bg-white rounded-lg p-3 mb-3">
+                      <div className="text-3xl font-bold text-blue-600 mb-1">
+                        ${formatNumber(projectedPrice)}
+                        <span className="text-lg font-normal text-gray-600">/mo</span>
+                      </div>
+                      <div className="text-sm text-gray-700">
+                        ${formatNumber(projectedPricePerUnit!)} per {selectedPlan === 'ai-advisor' ? 'user' : terminology.singular}
+                      </div>
+                      {isAnnual && (
+                        <div className="text-xs text-green-600 font-medium mt-1">
+                          Billed annually (${formatNumber(projectedPrice * 12)}/year)
+                        </div>
+                      )}
+                    </div>
+
+                    {savingsPerUnit && savingsPerUnit > 0 && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-2.5">
+                        <div className="flex items-center gap-2 text-sm text-green-800">
+                          <span className="text-lg">💰</span>
+                          <span className="font-medium">
+                            Save ${formatNumber(savingsPerUnit)} per {selectedPlan === 'ai-advisor' ? 'user' : terminology.singular} vs. current pricing
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {savingsPerUnit && savingsPerUnit < 0 && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                        <div className="flex items-center gap-2 text-sm text-amber-800">
+                          <span className="text-lg">📈</span>
+                          <span className="font-medium">
+                            ${formatNumber(Math.abs(savingsPerUnit))} more per {selectedPlan === 'ai-advisor' ? 'user' : terminology.singular} than current pricing
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {wholesaleDiscount > 0 && isAnnual && (
                 <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
@@ -1784,6 +1932,9 @@ function App() {
           onboardingFeeDescription={onboardingFeeDescription}
           quoteStartDate={quoteStartDate}
           quoteExpirationDays={quoteExpirationDays}
+          customTermsEnabled={customTermsEnabled}
+          customTermsTitle={customTermsTitle}
+          customTermsContent={customTermsContent}
           onUpdatePricing={handlePricingUpdate}
           isEmbedded={embedConfig.isEmbedded}
           terminology={terminology}
@@ -1844,7 +1995,7 @@ function App() {
           count: count,
           isAnnual: isAnnual,
         }}
-        formUrl={`https://www.auty.io/?uid=${quoteId || ''}&step=pricing`}
+        formUrl={`${window.location.origin}/?uid=${quoteId || ''}&step=pricing`}
       />
       </div>
     </div>

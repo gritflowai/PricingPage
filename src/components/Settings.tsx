@@ -4,7 +4,7 @@ import { type DiscountType } from '../utils/discountCalculator';
 import { type PlanType, type PlanConfig, type PricingTier } from '../config/planConfigs';
 import type { QuoteStatus } from '../types/quote';
 
-type TabType = PlanType | 'reseller' | 'discounts' | 'royalty-processing' | 'onboarding-fee';
+type TabType = PlanType | 'reseller' | 'discounts' | 'royalty-processing' | 'onboarding-fee' | 'custom-terms';
 
 interface SettingsProps {
   planConfigs: Record<PlanType, PlanConfig>;
@@ -23,6 +23,9 @@ interface SettingsProps {
   onboardingFeeDescription: string;
   quoteStartDate: string;
   quoteExpirationDays: number;
+  customTermsEnabled: boolean;
+  customTermsTitle: string;
+  customTermsContent: string;
   onUpdatePricing: (
     configs: Record<PlanType, PlanConfig>,
     wholesaleDiscount: number,
@@ -39,7 +42,10 @@ interface SettingsProps {
     onboardingFeeTitle: string,
     onboardingFeeDescription: string,
     quoteStartDate: string,
-    quoteExpirationDays: number
+    quoteExpirationDays: number,
+    customTermsEnabled: boolean,
+    customTermsTitle: string,
+    customTermsContent: string
   ) => void;
   isEmbedded?: boolean;
   terminology?: {
@@ -74,6 +80,9 @@ const Settings: React.FC<SettingsProps> = ({
   onboardingFeeDescription: initialOnboardingFeeDescription,
   quoteStartDate: initialQuoteStartDate,
   quoteExpirationDays: initialQuoteExpirationDays,
+  customTermsEnabled: initialCustomTermsEnabled,
+  customTermsTitle: initialCustomTermsTitle,
+  customTermsContent: initialCustomTermsContent,
   onUpdatePricing,
   isEmbedded = false,
   terminology = { singular: 'company', plural: 'companies', capitalized: 'Companies' },
@@ -102,6 +111,9 @@ const Settings: React.FC<SettingsProps> = ({
   const [onboardingFeeDescription, setOnboardingFeeDescription] = useState(initialOnboardingFeeDescription);
   const [quoteStartDate, setQuoteStartDate] = useState(initialQuoteStartDate);
   const [quoteExpirationDays, setQuoteExpirationDays] = useState(initialQuoteExpirationDays);
+  const [customTermsEnabled, setCustomTermsEnabled] = useState(initialCustomTermsEnabled);
+  const [customTermsTitle, setCustomTermsTitle] = useState(initialCustomTermsTitle);
+  const [customTermsContent, setCustomTermsContent] = useState(initialCustomTermsContent);
 
   // Split out WorldPay fee and service fee (initialize from total if already set)
   const [worldPayFee, setWorldPayFee] = useState(() => {
@@ -144,7 +156,10 @@ const Settings: React.FC<SettingsProps> = ({
       onboardingFeeTitle,
       onboardingFeeDescription,
       quoteStartDate,
-      quoteExpirationDays
+      quoteExpirationDays,
+      customTermsEnabled,
+      customTermsTitle,
+      customTermsContent
     );
     setIsOpen(false);
   };
@@ -403,6 +418,16 @@ const Settings: React.FC<SettingsProps> = ({
         }`}
       >
         Onboarding Fee
+      </button>
+      <button
+        onClick={() => setActiveTab('custom-terms')}
+        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+          activeTab === 'custom-terms'
+            ? 'bg-[#1239FF] text-white'
+            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+        }`}
+      >
+        Custom Terms
       </button>
     </div>
   );
@@ -1109,6 +1134,109 @@ const Settings: React.FC<SettingsProps> = ({
     </div>
   );
 
+  const renderCustomTermsSettings = () => (
+    <div className="space-y-8">
+      <div>
+        <h3 className="text-lg font-semibold mb-4">Custom Terms & Conditions</h3>
+        <p className="text-sm text-gray-600 mb-6">
+          Add custom terms, statement of work, special conditions, or integration details to your quotes.
+          This section appears below the pricing details and is perfect for enterprise deals requiring custom work.
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={customTermsEnabled}
+                onChange={(e) => setCustomTermsEnabled(e.target.checked)}
+                className="rounded border-gray-300 text-[#1239FF] h-4 w-4"
+              />
+              <span className="ml-2 text-sm font-medium text-gray-700">
+                Enable Custom Terms Section
+              </span>
+            </label>
+            <p className="text-xs text-gray-500 mt-1 ml-6">
+              Show this section in quotes when content is provided
+            </p>
+          </div>
+
+          {customTermsEnabled && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Section Title
+                </label>
+                <input
+                  type="text"
+                  value={customTermsTitle}
+                  onChange={(e) => setCustomTermsTitle(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  placeholder="Custom Terms & Conditions"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Heading shown at the top of the custom terms section
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Content
+                </label>
+                <textarea
+                  value={customTermsContent}
+                  onChange={(e) => setCustomTermsContent(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm"
+                  rows={10}
+                  placeholder="Enter custom terms, statement of work, integration details, or special conditions...
+
+Examples:
+• Custom UPS integration with real-time tracking
+• Amazon Returns Portal integration
+• Dedicated account manager and priority support
+• Quarterly business reviews included
+• Custom reporting dashboards"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {customTermsContent.length} characters • Line breaks will be preserved
+                </p>
+              </div>
+
+              {customTermsContent && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-medium text-blue-900 mb-3">Preview</h4>
+                  <div className="bg-white border border-blue-300 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-blue-600 text-lg">📋</span>
+                      <span className="font-semibold text-gray-900">{customTermsTitle}</span>
+                    </div>
+                    <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed border-t border-gray-200 pt-2 pl-7">
+                      {customTermsContent}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h4 className="font-medium text-green-900 mb-2">Common Use Cases</h4>
+                <ul className="text-sm text-green-800 space-y-1 list-disc list-inside">
+                  <li>Statement of Work (SOW) for custom development</li>
+                  <li>Custom integration details (UPS, Amazon, etc.)</li>
+                  <li>Special payment terms or milestone schedules</li>
+                  <li>Service level agreements (SLAs)</li>
+                  <li>Implementation timeline and deliverables</li>
+                  <li>Customer-specific requirements or exclusions</li>
+                  <li>Training and support commitments</li>
+                  <li>Data migration or setup services</li>
+                </ul>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   const renderRoyaltyProcessingSettings = () => (
     <div className="space-y-8">
       <div>
@@ -1296,6 +1424,7 @@ const Settings: React.FC<SettingsProps> = ({
                activeTab === 'discounts' ? renderDiscountsSettings() :
                activeTab === 'royalty-processing' ? renderRoyaltyProcessingSettings() :
                activeTab === 'onboarding-fee' ? renderOnboardingFeeSettings() :
+               activeTab === 'custom-terms' ? renderCustomTermsSettings() :
                renderPlanSettings(activeTab as PlanType)}
             </div>
 

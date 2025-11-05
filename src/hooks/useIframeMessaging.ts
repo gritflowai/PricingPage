@@ -13,6 +13,9 @@ export interface PricingSelectionData {
   resellerCommissionAmount: number;
   wholesaleDiscount: number;
   resellerCommission: number;
+  projectedLocations?: number | null;
+  projectedPrice?: number | null;
+  projectedPricePerUnit?: number | null;
   customDiscount?: {
     type: 'percentage' | 'fixed';
     value: number;

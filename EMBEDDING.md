@@ -94,6 +94,7 @@ Customize the pricing calculator behavior using URL parameters:
 - `&admin=true` - **Admin mode for salespeople** (`isAdmin` property - see [Admin Mode](#admin-mode-new) section below)
 - `&plan=growth` - Pre-select a plan (`ai-advisor`, `starter`, `growth`, `scale`)
 - `&count=25` - Pre-fill companies/users count
+- `&projectedLocations=6000` - Show future pricing projection at specified count (displays "what you'll pay at scale")
 - `&annual=true` - Pre-select annual billing (`true` or `false`)
 - `&discountType=percentage` - Pre-apply a discount type (`percentage` or `fixed`)
 - `&discountValue=15` - Pre-apply discount value (percentage as number or dollar amount)
@@ -133,6 +134,18 @@ Customize the pricing calculator behavior using URL parameters:
 ></iframe>
 ```
 
+### Example: With Projected Pricing (Future Growth Scenario)
+```html
+<!-- Show current pricing for 130 pilot locations + future pricing for 6,000 locations at scale -->
+<iframe
+  src="https://your-url.com?embedded=true&theme=transparent&userType=franchisee&count=130&projectedLocations=6000&annual=true"
+  width="100%"
+  height="800"
+></iframe>
+```
+
+**Use Case:** Perfect for sales presentations where customers need to understand pricing as they scale. For example, showing UPS that their 130-location pilot will cost $X/month, while their future 6,000-location rollout will cost $Y/month with volume discounts.
+
 ## Message Types & Data Structures
 
 ### 1. IFRAME_READY
@@ -168,6 +181,11 @@ Sent whenever user changes selections (debounced 300ms for sliders).
     resellerCommissionAmount: 0,       // Dollar amount of reseller commission
     wholesaleDiscount: 0,              // Wholesale discount percentage
     resellerCommission: 0,             // Reseller commission percentage
+
+    // NEW: Projected pricing (null if not set via projectedLocations parameter)
+    projectedLocations: 6000,          // Future/target location count (null if not provided)
+    projectedPrice: 50460.00,          // Projected monthly price at future count (null if not provided)
+    projectedPricePerUnit: 8.41,       // Projected price per unit at future count (null if not provided)
 
     // NEW: Custom discount (null if no discount applied)
     customDiscount: {
