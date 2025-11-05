@@ -129,4 +129,18 @@
   .pulse-glow {
     animation: pulse-glow 1s ease-in-out;
   }
+
+  /* Badge pulse animation for MOST POPULAR */
+  @keyframes badge-pulse {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+  }
+
+  .badge-pulse {
+    animation: badge-pulse 2s ease-in-out infinite;
+  }
 }

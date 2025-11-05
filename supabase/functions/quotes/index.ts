@@ -304,6 +304,126 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // POST /quotes/unlock - Unlock a quote (return to draft)
+    if (req.method === 'POST' && path === '/unlock') {
+      const body: { id: string } = await req.json();
+
+      // Validate required fields
+      if (!body.id) {
+        return new Response(
+          JSON.stringify({ error: 'Missing required field: id' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      const now = new Date().toISOString();
+
+      // Update quote to draft status (from locked or accepted)
+      // Clear locked_at, expires_at, and accepted_at
+      // Reset version to 1
+      const { data, error } = await supabase
+        .from('quotes')
+        .update({
+          status: 'draft',
+          locked_at: null,
+          expires_at: null,
+          accepted_at: null,
+          version: 1,
+          updated_at: now,
+        })
+        .eq('id', body.id)
+        .in('status', ['locked', 'accepted'])
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        return new Response(
+          JSON.stringify({ error: `Failed to unlock quote: ${error.message}` }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      if (!data) {
+        return new Response(
+          JSON.stringify({ error: 'Quote not found or not in locked/accepted status' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      return new Response(JSON.stringify(data), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // POST /quotes/accept - Accept a locked quote
+    if (req.method === 'POST' && path === '/accept') {
+      const body: { id: string; accepted_at?: string; email?: string } = await req.json();
+
+      // Validate required fields
+      if (!body.id) {
+        return new Response(
+          JSON.stringify({ error: 'Missing required field: id' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      const acceptedAt = body.accepted_at || new Date().toISOString();
+
+      // Update quote to accepted status (only if currently locked)
+      const { data, error } = await supabase
+        .from('quotes')
+        .update({
+          status: 'accepted',
+          accepted_at: acceptedAt,
+          updated_at: acceptedAt,
+        })
+        .eq('id', body.id)
+        .eq('status', 'locked')
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        return new Response(
+          JSON.stringify({ error: `Failed to accept quote: ${error.message}` }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      if (!data) {
+        return new Response(
+          JSON.stringify({ error: 'Quote not found or not in locked status' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // TODO: Send confirmation email to body.email if provided
+      // TODO: Trigger onboarding workflow
+
+      return new Response(JSON.stringify(data), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // GET /quotes/:id - Load an existing quote
     if (req.method === 'GET' && path.startsWith('/')) {
       const id = path.substring(1);

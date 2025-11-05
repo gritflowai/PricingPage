@@ -77,6 +77,27 @@ export async function lockQuote(
   })
 }
 
+export async function unlockQuote(id: string): Promise<Quote> {
+  return apiFetch<Quote>('/quotes/unlock', {
+    method: 'POST',
+    body: JSON.stringify({ id }),
+  })
+}
+
 export async function getQuote(id: string): Promise<Quote> {
   return apiFetch<Quote>(`/quotes/${id}`)
+}
+
+export async function acceptQuote(
+  id: string,
+  email?: string
+): Promise<Quote> {
+  return apiFetch<Quote>('/quotes/accept', {
+    method: 'POST',
+    body: JSON.stringify({
+      id,
+      accepted_at: new Date().toISOString(),
+      email,
+    }),
+  })
 }

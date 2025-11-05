@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Settings2, X, Plus, AlertCircle, RotateCcw } from 'lucide-react';
+import { Settings2, X, Plus, AlertCircle, RotateCcw, Unlock } from 'lucide-react';
 import { type DiscountType } from '../utils/discountCalculator';
 import { type PlanType, type PlanConfig, type PricingTier } from '../config/planConfigs';
+import type { QuoteStatus } from '../types/quote';
+
 type TabType = PlanType | 'reseller' | 'discounts' | 'royalty-processing' | 'onboarding-fee';
 
 interface SettingsProps {
@@ -46,6 +48,13 @@ interface SettingsProps {
     capitalized: string;
   };
   defaultPlanConfigs: Record<PlanType, PlanConfig>;
+  // Quote-related props
+  quoteMode?: boolean;
+  quoteId?: string | null;
+  quoteStatus?: QuoteStatus;
+  quoteLockedAt?: string | null;
+  quoteAcceptedAt?: string | null;
+  onUnlockQuote?: () => Promise<void>;
 }
 
 const Settings: React.FC<SettingsProps> = ({
@@ -68,7 +77,13 @@ const Settings: React.FC<SettingsProps> = ({
   onUpdatePricing,
   isEmbedded = false,
   terminology = { singular: 'company', plural: 'companies', capitalized: 'Companies' },
-  defaultPlanConfigs
+  defaultPlanConfigs,
+  quoteMode = false,
+  quoteId = null,
+  quoteStatus = 'draft',
+  quoteLockedAt = null,
+  quoteAcceptedAt = null,
+  onUnlockQuote
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('ai-advisor');
@@ -248,6 +263,63 @@ const Settings: React.FC<SettingsProps> = ({
       pricingTiers: newConfigs[plan].pricingTiers.filter((_, i) => i !== index)
     };
     setUpdatedConfigs(newConfigs);
+  };
+
+  const renderQuoteStatusIndicator = () => {
+    if (!quoteMode || !quoteId) return null;
+
+    const getStatusBadge = () => {
+      switch (quoteStatus) {
+        case 'draft':
+          return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800">Draft</span>;
+        case 'locked':
+          return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-orange-100 text-orange-800">Locked</span>;
+        case 'accepted':
+          return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-800">Accepted</span>;
+        case 'expired':
+          return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-800">Expired</span>;
+        default:
+          return null;
+      }
+    };
+
+    const formatDate = (dateString: string | null) => {
+      if (!dateString) return null;
+      return new Date(dateString).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    };
+
+    return (
+      <div className="bg-gray-50 border-b border-gray-200 px-6 py-2">
+        <div className="flex items-center gap-4 text-xs text-gray-600">
+          <div className="flex items-center gap-2">
+            <span className="font-medium">Quote Status:</span>
+            {getStatusBadge()}
+          </div>
+          {quoteStartDate && (
+            <div className="flex items-center gap-1">
+              <span>Created:</span>
+              <span className="font-medium text-gray-900">{formatDate(quoteStartDate)}</span>
+            </div>
+          )}
+          {quoteLockedAt && (quoteStatus === 'locked' || quoteStatus === 'accepted' || quoteStatus === 'expired') && (
+            <div className="flex items-center gap-1">
+              <span>Locked:</span>
+              <span className="font-medium text-gray-900">{formatDate(quoteLockedAt)}</span>
+            </div>
+          )}
+          {quoteAcceptedAt && quoteStatus === 'accepted' && (
+            <div className="flex items-center gap-1">
+              <span>Accepted:</span>
+              <span className="font-medium text-gray-900">{formatDate(quoteAcceptedAt)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   const renderPricingTabs = () => (
@@ -663,6 +735,60 @@ const Settings: React.FC<SettingsProps> = ({
                 Shorter periods create urgency without being too restrictive.
               </p>
             </div>
+
+            {/* Quote Lock/Unlock Section */}
+            {quoteMode && quoteId && (
+              <div className="mt-4 border-t border-gray-200 pt-4">
+                {(quoteStatus === 'locked' || quoteStatus === 'accepted') && onUnlockQuote && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-amber-900 mb-2">Quote Management</h4>
+                        <p className="text-sm text-amber-800 mb-3">
+                          This quote is currently {quoteStatus}. Unlocking will return it to draft status and clear the lock date and expiration.
+                        </p>
+                        {quoteStatus === 'accepted' && (
+                          <div className="bg-red-50 border border-red-300 rounded p-2 mb-3">
+                            <p className="text-xs text-red-700">
+                              <strong>⚠️ Warning:</strong> This quote has been accepted via click-wrap. Unlocking an accepted quote should only be done with caution.
+                            </p>
+                          </div>
+                        )}
+                        <button
+                          onClick={async () => {
+                            const confirmMessage = quoteStatus === 'accepted'
+                              ? 'This quote has been accepted. Are you sure you want to unlock it? This will reset it to draft status.'
+                              : 'Are you sure you want to unlock this quote? This will reset it to draft status and allow editing.';
+
+                            if (window.confirm(confirmMessage)) {
+                              try {
+                                await onUnlockQuote();
+                                alert('Quote unlocked successfully. You can now edit and re-lock it.');
+                              } catch (error) {
+                                console.error('Failed to unlock quote:', error);
+                                alert('Failed to unlock quote. Please try again.');
+                              }
+                            }
+                          }}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors font-medium"
+                        >
+                          <Unlock className="w-4 h-4" />
+                          Unlock Quote
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {quoteStatus === 'draft' && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-medium text-blue-900 mb-2">Quote is in Draft Mode</h4>
+                    <p className="text-sm text-blue-800">
+                      To lock this quote, click the "Lock Quote" button on the main pricing page. Once locked, you can come back here to unlock it if needed.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1144,20 +1270,28 @@ const Settings: React.FC<SettingsProps> = ({
       {isOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full mx-4 max-h-[90vh] overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900">Pricing Settings</h2>
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-6 h-6" />
-                </button>
+            <div className="border-b border-gray-200">
+              <div className="p-6 pb-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-gray-900">Pricing Settings</h2>
+                  <button
+                    onClick={() => setIsOpen(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
               </div>
-              {renderPricingTabs()}
+
+              {/* Quote Status Indicator */}
+              {renderQuoteStatusIndicator()}
+
+              <div className="px-6 pb-6">
+                {renderPricingTabs()}
+              </div>
             </div>
 
-            <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 200px)' }}>
+            <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 280px)' }}>
               {activeTab === 'reseller' ? renderResellerSettings() :
                activeTab === 'discounts' ? renderDiscountsSettings() :
                activeTab === 'royalty-processing' ? renderRoyaltyProcessingSettings() :

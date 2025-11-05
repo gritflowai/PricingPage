@@ -3,10 +3,12 @@ import PricingToggle from './components/PricingToggle';
 import CompanySlider from './components/CompanySlider';
 import Settings from './components/Settings';
 import ContactModal from './components/ContactModal';
+import ClickWrapModal from './components/ClickWrapModal';
 import Tooltip from './components/Tooltip';
 import RoleSelector from './components/RoleSelector';
 import FeatureComparison from './components/FeatureComparison';
 import { QuoteModeBanner } from './components/QuoteModeBanner';
+import SocialProofBadges from './components/SocialProofBadges';
 import { AlertCircle, ChevronDown, Shield, CreditCard, RefreshCw, Copy, BarChart3 } from 'lucide-react';
 import { useIframeMessaging } from './hooks/useIframeMessaging';
 import { calculateCustomDiscount, type DiscountType } from './utils/discountCalculator';
@@ -270,10 +272,12 @@ function App() {
 
   // Quote mode state
   const [quoteMode, setQuoteMode] = useState(embedConfig.mode === 'quote');
+  const [showClickWrapModal, setShowClickWrapModal] = useState(false);
   const [quoteId, setQuoteId] = useState<string | null>(embedConfig.quoteId);
   const [quoteStatus, setQuoteStatus] = useState<QuoteStatus>('draft');
   const [quoteExpiresAt, setQuoteExpiresAt] = useState<string | null>(null);
   const [quoteLockedAt, setQuoteLockedAt] = useState<string | null>(null);
+  const [quoteAcceptedAt, setQuoteAcceptedAt] = useState<string | null>(null);
   const [currentPricingModelId, setCurrentPricingModelId] = useState<string | null>(null);
 
   // Admin mode state (for salespeople)
@@ -387,6 +391,7 @@ function App() {
           setQuoteStatus(existingQuote.status);
           setQuoteExpiresAt(existingQuote.expires_at);
           setQuoteLockedAt(existingQuote.locked_at);
+          setQuoteAcceptedAt(existingQuote.accepted_at || null);
           setCurrentPricingModelId(existingQuote.pricing_model_id);
 
           // Set selections from quote
@@ -837,15 +842,82 @@ function App() {
     }
   };
 
+  const handleUnlockQuote = async () => {
+    if (!quoteId) return;
+
+    try {
+      const unlockedQuote = await quoteApi.unlockQuote(quoteId);
+
+      // Update state to reflect unlocked status
+      setQuoteStatus('draft');
+      setQuoteExpiresAt(null);
+      setQuoteLockedAt(null);
+
+      // Set quote start date to current date as per user requirements
+      const currentDate = new Date().toISOString().split('T')[0];
+      setQuoteStartDate(currentDate);
+
+      // Emit QUOTE_UNLOCKED message
+      sendQuoteMessage('QUOTE_UNLOCKED', {
+        id: quoteId,
+        version: 1, // Back to draft version
+        status: 'draft',
+        pricingModelId: currentPricingModelId,
+        payload: unlockedQuote
+      });
+
+      console.log('[PricingCalculator] Quote unlocked:', {
+        quoteId,
+        newStartDate: currentDate,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Failed to unlock quote:', error);
+      sendQuoteError(
+        error instanceof Error ? error.message : 'Failed to unlock quote',
+        'UNKNOWN',
+        { quoteId, error }
+      );
+      throw error; // Re-throw so the Settings component can handle the error
+    }
+  };
+
   const handleAcceptQuote = () => {
     if (!quoteId) return;
 
-    // Emit QUOTE_ACCEPT_INTENT message (parent handles click-wrap)
-    sendQuoteMessage('QUOTE_ACCEPT_INTENT', {
-      id: quoteId,
-      version: 2, // Locked quotes have version 2
-      status: 'locked',
-      pricingModelId: currentPricingModelId,
+    // Check if we're in an iframe (embedded mode)
+    if (isInIframe) {
+      // Embedded mode: Emit QUOTE_ACCEPT_INTENT message (parent handles click-wrap)
+      sendQuoteMessage('QUOTE_ACCEPT_INTENT', {
+        id: quoteId,
+        version: 2, // Locked quotes have version 2
+        status: 'locked',
+        pricingModelId: currentPricingModelId,
+      });
+    } else {
+      // Standalone mode: Show click-wrap modal
+      setShowClickWrapModal(true);
+    }
+  };
+
+  // Handle quote acceptance from modal (standalone mode)
+  // Opens the main form where they can complete quote acceptance
+  const handleModalAcceptQuote = () => {
+    if (!quoteId) return;
+
+    // Generate the form URL with quoteId as uid parameter and step=pricing to navigate directly to pricing step
+    const formUrl = `https://www.auty.io/?uid=${quoteId}&step=pricing`;
+
+    // Open in new tab
+    window.open(formUrl, '_blank');
+
+    // Close modal
+    setShowClickWrapModal(false);
+
+    console.log('[PricingCalculator] Redirecting to form for quote acceptance:', {
+      quoteId,
+      formUrl,
+      timestamp: new Date().toISOString()
     });
   };
 
@@ -862,6 +934,7 @@ function App() {
         // Here you would call an API to mark the quote as accepted
         // For now, we'll just update local state and send confirmation
         setQuoteStatus('accepted');
+        setQuoteAcceptedAt(acceptedAt);
 
         // Send QUOTE_ACCEPTED confirmation back to parent
         sendQuoteMessage('QUOTE_ACCEPTED', {
@@ -986,7 +1059,7 @@ function App() {
             >
               {/* Most Popular Badge */}
               <div className="absolute -top-2.5 md:-top-3 left-1/2 -translate-x-1/2 z-10">
-                <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] md:text-xs font-bold px-2 sm:px-3 md:px-4 py-1 rounded-full shadow-md whitespace-nowrap">
+                <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] md:text-xs font-bold px-2 sm:px-3 md:px-4 py-1 rounded-full shadow-md whitespace-nowrap badge-pulse">
                   MOST POPULAR
                 </div>
               </div>
@@ -1013,7 +1086,8 @@ function App() {
               className="flex-1 px-4 py-3 rounded-md smooth-transition bg-gradient-to-r from-gray-700 to-gray-800 text-white hover:from-[#180D43] hover:to-[#1239FF] hover:shadow-lg"
             >
               <div className="font-bold text-sm sm:text-base md:text-lg">Enterprise</div>
-              <div className="text-[11px] sm:text-xs md:text-sm mt-1 opacity-90">Custom pricing • Unlimited</div>
+              <div className="text-[11px] sm:text-xs md:text-sm mt-0.5 opacity-90">Custom pricing • Unlimited</div>
+              <div className="text-[10px] sm:text-xs mt-0.5 opacity-75">Talk to Sales</div>
             </button>
           </div>
         </div>
@@ -1149,19 +1223,35 @@ function App() {
                   // Quote Mode Buttons
                   <>
                     {quoteStatus === 'draft' && (
-                      <button
-                        onClick={handleLockQuote}
-                        className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-blue-700 smooth-transition transform hover:scale-[1.02]"
-                      >
-                        Lock Quote for {embedConfig.expiresInDays} Days
-                      </button>
+                      <>
+                        {/* Social Proof Above Lock Quote Button */}
+                        <div className="mb-3 text-center">
+                          <p className="text-sm text-gray-600">
+                            <span className="text-orange-600 font-semibold">Trusted by 3,500+ businesses</span>
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={handleLockQuote}
+                          className="w-full bg-orange-500 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-orange-600 smooth-transition transform hover:scale-[1.02] shadow-lg hover:shadow-xl"
+                        >
+                          Lock Quote for {embedConfig.expiresInDays} Days — No Payment Required
+                        </button>
+                      </>
                     )}
 
                     {quoteStatus === 'locked' && (
                       <>
+                        {/* Social Proof Above Accept Quote Button */}
+                        <div className="mb-3 text-center">
+                          <p className="text-sm text-gray-600">
+                            <span className="text-orange-600 font-semibold">🎉 Your quote is locked!</span> Accept now to get started.
+                          </p>
+                        </div>
+
                         <button
                           onClick={handleAcceptQuote}
-                          className="w-full bg-green-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-green-700 smooth-transition transform hover:scale-[1.02]"
+                          className="w-full bg-orange-500 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-orange-600 smooth-transition transform hover:scale-[1.02] shadow-lg hover:shadow-xl"
                         >
                           Accept Quote
                         </button>
@@ -1197,11 +1287,63 @@ function App() {
                         Quote Expired
                       </div>
                     )}
+
+                    {/* Social Proof for Quote Mode - Below Buttons */}
+                    {(quoteStatus === 'draft' || quoteStatus === 'locked') && (
+                      <>
+                        {/* Trust Badges */}
+                        <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-4 text-xs text-[#180D43]/60">
+                          <span className="flex items-center gap-1">
+                            <CreditCard className="w-3 h-3" />
+                            No payment required
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <RefreshCw className="w-3 h-3" />
+                            Cancel anytime
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Shield className="w-3 h-3" />
+                            30-day money-back guarantee
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Shield className="w-3 h-3" />
+                            SOC 2 Type 1 certified
+                          </span>
+                          <span className="flex items-center gap-1">
+                            🔒
+                            SSL secure checkout
+                          </span>
+                        </div>
+
+                        {/* Customer Count & Reviews */}
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                          <div className="text-center mb-2">
+                            <p className="text-sm text-gray-600">
+                              <span className="text-[#1239FF] font-semibold">Trusted by 3,500+ businesses</span>
+                            </p>
+                          </div>
+                          <a
+                            href="https://www.autymate.com/reviews"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex justify-center items-center gap-2 text-sm text-gray-700 hover:text-[#1239FF] smooth-transition"
+                          >
+                            <div className="flex gap-0.5">
+                              {[...Array(5)].map((_, i) => (
+                                <span key={i} className="text-orange-400">⭐</span>
+                              ))}
+                            </div>
+                            <span className="font-semibold">1,000+ 5-star reviews</span>
+                            <span className="text-xs text-gray-500">→</span>
+                          </a>
+                        </div>
+                      </>
+                    )}
                   </>
                 ) : (
                   // Calculator Mode Button
                   <>
-                    {/* Social Proof */}
+                    {/* Customer Count Social Proof - Above Button */}
                     <div className="mb-3 text-center">
                       <p className="text-sm text-gray-600">
                         <span className="text-[#1239FF] font-semibold">Join 3,500+ customers</span> from franchisor, SMB to enterprises
@@ -1234,40 +1376,46 @@ function App() {
                           },
                         });
                       }}
-                      className="w-full bg-[#1239FF] text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-[#1239FF]/90 smooth-transition transform hover:scale-[1.02] glow-blue hover:glow-blue-strong"
+                      className="w-full bg-[#FF6B35] text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-[#FF5722] smooth-transition transform hover:scale-[1.02] shadow-lg hover:shadow-xl"
                     >
                       Start Free Trial — No Credit Card
                     </button>
 
-                    {/* Trust Indicators - Only in Calculator Mode */}
-                    <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-3 text-xs text-[#180D43]/60">
-                      <span className="flex items-center gap-1">
-                        <CreditCard className="w-3 h-3" />
-                        No credit card required
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <RefreshCw className="w-3 h-3" />
-                        Cancel anytime
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Shield className="w-3 h-3" />
-                        7-day free trial
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Shield className="w-3 h-3" />
-                        30-day money-back guarantee
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Shield className="w-3 h-3" />
-                        SOC 2 Type 1 certified
-                      </span>
-                      <span className="flex items-center gap-1">
-                        🔒
-                        SSL secure checkout
-                      </span>
+                    {/* Trust Badges & Reviews - Below Button */}
+                    <div className="mt-3 space-y-2">
+                      {/* Row 1: Trial Benefits */}
+                      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-xs text-[#180D43]/60">
+                        <span className="flex items-center gap-1">
+                          <CreditCard className="w-3 h-3" />
+                          No credit card required
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <RefreshCw className="w-3 h-3" />
+                          Cancel anytime
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Shield className="w-3 h-3" />
+                          7-day free trial
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Shield className="w-3 h-3" />
+                          30-day money-back guarantee
+                        </span>
+                      </div>
+                      {/* Row 2: Security */}
+                      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-xs text-[#180D43]/60">
+                        <span className="flex items-center gap-1">
+                          <Shield className="w-3 h-3" />
+                          SOC 2 Type 1 certified
+                        </span>
+                        <span className="flex items-center gap-1">
+                          🔒
+                          SSL secure checkout
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Social Proof */}
+                    {/* 5-Star Reviews Link */}
                     <a
                       href="https://www.autymate.com/reviews"
                       target="_blank"
@@ -1619,6 +1767,12 @@ function App() {
           isEmbedded={embedConfig.isEmbedded}
           terminology={terminology}
           defaultPlanConfigs={DEFAULT_PLAN_CONFIGS}
+          quoteMode={quoteMode}
+          quoteId={quoteId}
+          quoteStatus={quoteStatus}
+          quoteLockedAt={quoteLockedAt}
+          quoteAcceptedAt={quoteAcceptedAt}
+          onUnlockQuote={handleUnlockQuote}
         />
       )}
 
@@ -1656,6 +1810,20 @@ function App() {
             },
           });
         }}
+      />
+
+      {/* Click-Wrap Modal for Standalone Quote Acceptance */}
+      <ClickWrapModal
+        isOpen={showClickWrapModal}
+        onClose={() => setShowClickWrapModal(false)}
+        onAccept={handleModalAcceptQuote}
+        quoteSummary={{
+          price: `$${finalPriceWithRoyalty.toFixed(2)}`,
+          plan: currentPlan.name,
+          count: count,
+          isAnnual: isAnnual,
+        }}
+        formUrl={`https://www.auty.io/?uid=${quoteId || ''}&step=pricing`}
       />
       </div>
     </div>
