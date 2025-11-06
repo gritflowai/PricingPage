@@ -14,7 +14,8 @@
       "Bash(npx update-browserslist-db@latest:*)",
       "Bash(timeout 3 bash:*)",
       "Bash(node:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
