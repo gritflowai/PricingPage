@@ -1,4 +1,5 @@
 // API client for Quote Mode - wraps all Supabase function calls
+// Note: 'id' parameters refer to Form IDs (UUIDs) that secure access to quotes
 
 import type {
   Quote,

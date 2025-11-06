@@ -12,7 +12,9 @@
       "Bash(npm start)",
       "Bash(timeout 5 bash:*)",
       "Bash(npx update-browserslist-db@latest:*)",
-      "Bash(timeout 3 bash:*)"
+      "Bash(timeout 3 bash:*)",
+      "Bash(node:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

@@ -9,7 +9,9 @@ import RoleSelector from './components/RoleSelector';
 import FeatureComparison from './components/FeatureComparison';
 import { QuoteModeBanner } from './components/QuoteModeBanner';
 import SocialProofBadges from './components/SocialProofBadges';
-import { AlertCircle, ChevronDown, Shield, CreditCard, RefreshCw, Copy, BarChart3 } from 'lucide-react';
+import NudgeBanner from './components/NudgeBanner';
+import FormIdErrorBanner from './components/FormIdErrorBanner';
+import { AlertCircle, ChevronDown, Shield, CreditCard, RefreshCw, Copy, BarChart3, TrendingUp, DollarSign, FileText } from 'lucide-react';
 import { useIframeMessaging } from './hooks/useIframeMessaging';
 import { calculateCustomDiscount, type DiscountType } from './utils/discountCalculator';
 import { useQuoteMode } from './hooks/useQuoteMode';
@@ -121,7 +123,7 @@ function getEmbedConfig() {
     projectedLocations: params.has('projectedLocations') ? parseInt(params.get('projectedLocations')!, 10) : null,
     // Quote mode parameters
     mode: params.get('mode') || 'calculator',
-    quoteId: params.get('id') || null,
+    formId: params.get('formId') || null,
     expiresInDays: parseInt(params.get('quoteExpiresInDays') || '14', 10),
     // User type parameter
     initialUserType,
@@ -242,7 +244,10 @@ function App() {
   const [userType, setUserType] = useState<UserType>(embedConfig.initialUserType ?? 'franchisee'); // Default to franchisee (target market)
   const [isAnnual, setIsAnnual] = useState(embedConfig.initialIsAnnual ?? true);
   const [count, setCount] = useState(embedConfig.initialCount ?? 10);
-  const [projectedLocations, setProjectedLocations] = useState<number | null>(embedConfig.projectedLocations ?? null);
+  // Projected locations only available in quote mode
+  const [projectedLocations, setProjectedLocations] = useState<number | null>(
+    embedConfig.mode === 'quote' ? (embedConfig.projectedLocations ?? null) : null
+  );
   const [selectedPlan, setSelectedPlan] = useState<PlanType>(embedConfig.initialPlan ?? 'starter');
   const [planConfigs, setPlanConfigs] = useState<Record<PlanType, PlanConfig>>(savedSettings.planConfigs);
   const [wholesaleDiscount, setWholesaleDiscount] = useState(savedSettings.wholesaleDiscount);
@@ -262,6 +267,8 @@ function App() {
   const [showPricingDetails, setShowPricingDetails] = useState(false);
   const [showPlanDetails, setShowPlanDetails] = useState(false);
   const [isEnterpriseRequest, setIsEnterpriseRequest] = useState(false);
+  const [showNudgeBanner, setShowNudgeBanner] = useState(false);
+  const [nudgeBannerDismissed, setNudgeBannerDismissed] = useState(false);
 
   // Royalty Payment Processing state (URL parameters take precedence over saved settings)
   const [royaltyProcessingEnabled, setRoyaltyProcessingEnabled] = useState(
@@ -302,7 +309,7 @@ function App() {
   // Quote mode state
   const [quoteMode, setQuoteMode] = useState(embedConfig.mode === 'quote');
   const [showClickWrapModal, setShowClickWrapModal] = useState(false);
-  const [quoteId, setQuoteId] = useState<string | null>(embedConfig.quoteId);
+  const [formId, setFormId] = useState<string | null>(embedConfig.formId);
   const [quoteStatus, setQuoteStatus] = useState<QuoteStatus>('draft');
   const [quoteExpiresAt, setQuoteExpiresAt] = useState<string | null>(null);
   const [quoteLockedAt, setQuoteLockedAt] = useState<string | null>(null);
@@ -444,15 +451,35 @@ function App() {
     }
   }, [count, currentPlan.contactThreshold, currentPlan.name, sendEnterpriseInquiry, isLocked, adminMode]);
 
+  // Show nudge banner when count crosses nudge threshold (but below contact threshold)
+  useEffect(() => {
+    if (
+      count >= currentPlan.nudgeThreshold &&
+      count < currentPlan.contactThreshold &&
+      !nudgeBannerDismissed &&
+      !isLocked &&
+      !adminMode
+    ) {
+      setShowNudgeBanner(true);
+    } else {
+      setShowNudgeBanner(false);
+    }
+  }, [count, currentPlan.nudgeThreshold, currentPlan.contactThreshold, nudgeBannerDismissed, isLocked, adminMode]);
+
+  // Reset dismissed state when plan changes
+  useEffect(() => {
+    setNudgeBannerDismissed(false);
+  }, [selectedPlan]);
+
   // Quote mode initialization
   useEffect(() => {
     if (!quoteMode) return;
 
     const initializeQuote = async () => {
       try {
-        if (quoteId) {
+        if (formId) {
           // Load existing quote
-          const existingQuote = await quoteApi.getQuote(quoteId);
+          const existingQuote = await quoteApi.getQuote(formId);
 
           // Update state from loaded quote
           setQuoteStatus(existingQuote.status);
@@ -475,6 +502,13 @@ function App() {
           // Restore settings from selection_raw
           if (existingQuote.selection_raw) {
             const raw = existingQuote.selection_raw as any;
+
+            // Restore projected locations
+            if (raw.projectedLocations) {
+              setProjectedLocations(raw.projectedLocations);
+            } else {
+              setProjectedLocations(null);
+            }
 
             // Restore custom discount
             if (raw.customDiscount) {
@@ -517,30 +551,15 @@ function App() {
             }
           }
         } else {
-          // Generate new quote ID
-          const newId = crypto.randomUUID();
-          setQuoteId(newId);
-
-          // Initialize quote with current selections
-          const newQuote = await quoteApi.initQuote({
-            id: newId,
-            selected_plan: selectedPlan,
-            count: count,
-            is_annual: isAnnual,
-          });
-
-          setCurrentPricingModelId(newQuote.pricing_model_id);
-          setQuoteStatus('draft');
-
-          // Emit QUOTE_ID_READY message
-          sendQuoteMessage('QUOTE_ID_READY', {
-            id: newId,
-            version: 1,
-            pricingModelId: newQuote.pricing_model_id,
-            status: 'draft',
-            expiresAt: null,
-            payload: newQuote
-          });
+          // No Form ID provided in quote mode - this is an error condition
+          // Do not auto-generate a Form ID - user must provide one via query parameter
+          // The error banner will display to inform the user
+          console.error('[PricingCalculator] Quote mode requires a formId parameter in the URL');
+          sendQuoteError(
+            'Quote mode requires a formId parameter in the URL',
+            'VALIDATION_ERROR'
+          );
+          return;
         }
       } catch (error) {
         console.error('Failed to initialize quote:', error);
@@ -644,7 +663,7 @@ function App() {
 
   // Debounced quote updates (only in draft mode)
   useEffect(() => {
-    if (!quoteMode || quoteStatus !== 'draft' || !quoteId) return;
+    if (!quoteMode || quoteStatus !== 'draft' || !formId) return;
 
     const timer = setTimeout(async () => {
       try {
@@ -675,6 +694,7 @@ function App() {
             selectedPlan,
             count,
             isAnnual,
+            projectedLocations: projectedLocations || null,
             customDiscount: customDiscountAmount > 0 && customDiscountType ? {
               type: customDiscountType,
               value: customDiscountValue,
@@ -702,11 +722,11 @@ function App() {
           },
         };
 
-        await quoteApi.updateQuote(quoteId, summary);
+        await quoteApi.updateQuote(formId, summary);
 
         // Emit QUOTE_SUMMARY_UPDATE message
         sendQuoteMessage('QUOTE_SUMMARY_UPDATE', {
-          id: quoteId,
+          id: formId,
           version: quoteStatus === 'locked' ? 2 : 1,
           selectedPlan,
           count,
@@ -723,7 +743,7 @@ function App() {
         sendQuoteError(
           error instanceof Error ? error.message : 'Failed to update quote',
           'UNKNOWN',
-          { quoteId, error }
+          { formId, error }
         );
       }
     }, 300); // 300ms debounce
@@ -732,10 +752,11 @@ function App() {
   }, [
     quoteMode,
     quoteStatus,
-    quoteId,
+    formId,
     selectedPlan,
     count,
     isAnnual,
+    projectedLocations,
     totalPrice,
     finalPriceWithRoyalty,
     pricePerUnit,
@@ -900,17 +921,17 @@ function App() {
 
   // Quote mode handlers
   const handleLockQuote = async () => {
-    if (!quoteId) return;
+    if (!formId) return;
 
     try {
-      const lockedQuote = await quoteApi.lockQuote(quoteId, quoteExpirationDays);
+      const lockedQuote = await quoteApi.lockQuote(formId, quoteExpirationDays);
       setQuoteStatus('locked');
       setQuoteExpiresAt(lockedQuote.expires_at);
       setQuoteLockedAt(lockedQuote.locked_at);
 
       // Emit QUOTE_LOCKED message
       sendQuoteMessage('QUOTE_LOCKED', {
-        id: quoteId,
+        id: formId,
         version: lockedQuote.version,
         expiresAt: lockedQuote.expires_at,
         lockedAt: lockedQuote.locked_at,
@@ -923,17 +944,17 @@ function App() {
       sendQuoteError(
         error instanceof Error ? error.message : 'Failed to lock quote',
         'UNKNOWN',
-        { quoteId, error }
+        { formId, error }
       );
       alert('Failed to lock quote. Please try again.');
     }
   };
 
   const handleUnlockQuote = async () => {
-    if (!quoteId) return;
+    if (!formId) return;
 
     try {
-      const unlockedQuote = await quoteApi.unlockQuote(quoteId);
+      const unlockedQuote = await quoteApi.unlockQuote(formId);
 
       // Update state to reflect unlocked status
       setQuoteStatus('draft');
@@ -946,7 +967,7 @@ function App() {
 
       // Emit QUOTE_UNLOCKED message
       sendQuoteMessage('QUOTE_UNLOCKED', {
-        id: quoteId,
+        id: formId,
         version: 1, // Back to draft version
         status: 'draft',
         pricingModelId: currentPricingModelId,
@@ -954,7 +975,7 @@ function App() {
       });
 
       console.log('[PricingCalculator] Quote unlocked:', {
-        quoteId,
+        formId,
         newStartDate: currentDate,
         timestamp: new Date().toISOString()
       });
@@ -963,17 +984,17 @@ function App() {
       sendQuoteError(
         error instanceof Error ? error.message : 'Failed to unlock quote',
         'UNKNOWN',
-        { quoteId, error }
+        { formId, error }
       );
       throw error; // Re-throw so the Settings component can handle the error
     }
   };
 
   const handleAcceptQuote = () => {
-    if (!quoteId) return;
+    if (!formId) return;
 
     console.log('[PricingCalculator] Accept Quote clicked:', {
-      quoteId,
+      formId,
       isInIframe,
       isEmbedded: embedConfig.isEmbedded,
       timestamp: new Date().toISOString()
@@ -984,7 +1005,7 @@ function App() {
       // Embedded mode: Emit QUOTE_ACCEPT_INTENT message (parent handles click-wrap)
       console.log('[PricingCalculator] Embedded mode: Sending QUOTE_ACCEPT_INTENT message');
       sendQuoteMessage('QUOTE_ACCEPT_INTENT', {
-        id: quoteId,
+        id: formId,
         version: 2, // Locked quotes have version 2
         status: 'locked',
         pricingModelId: currentPricingModelId,
@@ -999,12 +1020,12 @@ function App() {
   // Handle quote acceptance from modal (standalone mode)
   // Opens the main form where they can complete quote acceptance
   const handleModalAcceptQuote = () => {
-    if (!quoteId) return;
+    if (!formId) return;
 
-    // Generate the form URL with quoteId as uid parameter and step=pricing to navigate directly to pricing step
+    // Generate the form URL with formId parameter and step=pricing to navigate directly to pricing step
     // Use the current domain instead of hardcoded URL
     const baseUrl = window.location.origin;
-    const formUrl = `${baseUrl}/?uid=${quoteId}&step=pricing`;
+    const formUrl = `${baseUrl}/?formId=${formId}&step=pricing`;
 
     // Open in new tab
     window.open(formUrl, '_blank');
@@ -1013,7 +1034,7 @@ function App() {
     setShowClickWrapModal(false);
 
     console.log('[PricingCalculator] Redirecting to form for quote acceptance:', {
-      quoteId,
+      formId,
       formUrl,
       timestamp: new Date().toISOString()
     });
@@ -1022,7 +1043,7 @@ function App() {
   // Handle incoming CONFIRM_QUOTE_ACCEPTANCE message from parent
   useEffect(() => {
     if (!incomingMessage || incomingMessage.type !== 'CONFIRM_QUOTE_ACCEPTANCE') return;
-    if (!quoteId || quoteStatus !== 'locked') return;
+    if (!formId || quoteStatus !== 'locked') return;
 
     const acceptQuote = async () => {
       try {
@@ -1036,7 +1057,7 @@ function App() {
 
         // Send QUOTE_ACCEPTED confirmation back to parent
         sendQuoteMessage('QUOTE_ACCEPTED', {
-          id: quoteId,
+          id: formId,
           version: 2,
           status: 'accepted',
           acceptedAt: acceptedAt,
@@ -1044,7 +1065,7 @@ function App() {
         });
 
         console.log('[PricingCalculator] Quote accepted:', {
-          quoteId,
+          formId,
           acceptedAt,
           timestamp: new Date().toISOString()
         });
@@ -1053,13 +1074,13 @@ function App() {
         sendQuoteError(
           error instanceof Error ? error.message : 'Failed to accept quote',
           'UNKNOWN',
-          { quoteId, error }
+          { formId, error }
         );
       }
     };
 
     acceptQuote();
-  }, [incomingMessage, quoteId, quoteStatus, currentPricingModelId, sendQuoteMessage, sendQuoteError]);
+  }, [incomingMessage, formId, quoteStatus, currentPricingModelId, sendQuoteMessage, sendQuoteError]);
 
   // Handle incoming SET_ADMIN_MODE message from parent
   useEffect(() => {
@@ -1072,10 +1093,10 @@ function App() {
 
   // Copy share link to clipboard
   const handleCopyShareLink = async () => {
-    if (!quoteId) return;
+    if (!formId) return;
 
     const baseUrl = window.location.origin + window.location.pathname;
-    const shareUrl = `${baseUrl}?mode=quote&id=${quoteId}`;
+    const shareUrl = `${baseUrl}?mode=quote&formId=${formId}`;
 
     try {
       await navigator.clipboard.writeText(shareUrl);
@@ -1102,6 +1123,9 @@ function App() {
 
   return (
     <div className={`${minHeight} ${backgroundColor}`}>
+      {/* Form ID Error Banner - shown at very top when in quote mode without formId */}
+      <FormIdErrorBanner show={quoteMode && !formId} />
+
       {/* Role Selector at the very top */}
       <RoleSelector selected={userType} onChange={setUserType} isEmbedded={embedConfig.isEmbedded} />
 
@@ -1192,6 +1216,24 @@ function App() {
       </div>
 
       <PricingToggle isAnnual={isAnnual} setIsAnnual={setIsAnnual} monthlySavings={monthlySavings} isEmbedded={embedConfig.isEmbedded} disabled={isLocked} />
+
+      {/* Nudge Banner - soft gate before contact threshold */}
+      {showNudgeBanner && (
+        <div className="max-w-4xl mx-auto">
+          <NudgeBanner
+            count={count}
+            unitLabel={selectedPlan === 'ai-advisor' ? 'users' : terminology.plural}
+            onSchedule={() => {
+              setShowNudgeBanner(false);
+              setShowContactModal(true);
+            }}
+            onDismiss={() => {
+              setShowNudgeBanner(false);
+              setNudgeBannerDismissed(true);
+            }}
+          />
+        </div>
+      )}
 
       <div className="max-w-4xl mx-auto">
         <div className={`grid md:grid-cols-2 ${gridGap}`}>
@@ -1743,7 +1785,7 @@ function App() {
                         <div className="border-t border-gray-200 pt-2 mt-2">
                           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                             <div className="flex items-start gap-2 mb-2">
-                              <span className="text-blue-600 text-lg">📋</span>
+                              <FileText className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                               <div className="flex-1">
                                 <h4 className="font-medium text-blue-900">{customTermsTitle}</h4>
                               </div>
@@ -1759,54 +1801,107 @@ function App() {
                 )}
               </div>
 
-              {/* Projected Pricing Display - Only show if projectedLocations is set */}
-              {projectedLocations && projectedLocations > 0 && projectedPrice && (
-                <div className="border-t border-gray-200 pt-4 mt-4">
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-2xl">📊</span>
-                      <h3 className="text-sm font-semibold text-blue-900">
-                        Projected Pricing at {projectedLocations.toLocaleString()} {selectedPlan === 'ai-advisor' ? (projectedLocations === 1 ? 'user' : 'users') : (projectedLocations === 1 ? terminology.singular : terminology.plural)}
-                      </h3>
-                    </div>
+              {/* Projected Pricing Calculator - Quote Mode Only */}
+              {quoteMode && selectedPlan !== 'ai-advisor' && (
+                <div className="border-t border-gray-200 pt-3 mt-3">
+                  {!projectedLocations && (
+                    <button
+                      onClick={() => setProjectedLocations(count * 5)}
+                      disabled={isLocked}
+                      className={`text-sm text-blue-600 hover:text-blue-800 flex items-center gap-2 w-full justify-center py-2 hover:bg-blue-50 rounded transition-colors ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <TrendingUp className="w-4 h-4" />
+                      <span>+ Calculate Pricing at Scale</span>
+                      <span className="text-xs text-gray-600">
+                        (see what you'll pay as you grow)
+                      </span>
+                    </button>
+                  )}
 
-                    <div className="bg-white rounded-lg p-3 mb-3">
-                      <div className="text-3xl font-bold text-blue-600 mb-1">
-                        ${formatNumber(projectedPrice)}
-                        <span className="text-lg font-normal text-gray-600">/mo</span>
+                  {projectedLocations && projectedLocations > 0 && projectedPrice && (
+                    <div className="bg-gradient-to-br from-emerald-50 via-blue-50 to-indigo-50 border-2 border-emerald-400 rounded-lg p-4 shadow-lg animate-in">
+                      {/* Header with input */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2 flex-1">
+                          <div className="bg-gradient-to-br from-emerald-500 to-blue-600 rounded-lg p-2">
+                            <TrendingUp className="w-5 h-5 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-emerald-900 text-sm">Pricing at Scale:</span>
+                              <input
+                                type="number"
+                                min={count + 1}
+                                max="10000"
+                                value={projectedLocations}
+                                onChange={(e) => setProjectedLocations(parseInt(e.target.value) || null)}
+                                disabled={isLocked}
+                                className="w-24 px-2 py-1 border border-emerald-300 rounded text-sm font-semibold text-emerald-900 bg-white/80 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              />
+                              <span className="text-sm text-gray-700">{terminology.plural}</span>
+                            </div>
+                          </div>
+                        </div>
+                        {!isLocked && (
+                          <button
+                            onClick={() => setProjectedLocations(null)}
+                            className="text-xs text-gray-500 hover:text-red-600 ml-2 mt-1"
+                            title="Remove projection"
+                          >
+                            ✕
+                          </button>
+                        )}
                       </div>
-                      <div className="text-sm text-gray-700">
-                        ${formatNumber(projectedPricePerUnit!)} per {selectedPlan === 'ai-advisor' ? 'user' : terminology.singular}
+
+                      {/* Price Display - Big and Bold */}
+                      <div className="bg-white/90 backdrop-blur rounded-lg p-4 mb-3 border border-emerald-200 shadow-sm">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <div className="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
+                            ${formatNumber(projectedPrice)}
+                          </div>
+                          <span className="text-lg font-normal text-gray-600">/mo</span>
+                        </div>
+                        <div className="text-sm text-gray-700 font-medium">
+                          ${formatNumber(projectedPricePerUnit!)} per {terminology.singular}
+                        </div>
+                        {isAnnual && (
+                          <div className="text-xs text-emerald-600 font-medium mt-1">
+                            Billed annually (${formatNumber(projectedPrice * 12)}/year)
+                          </div>
+                        )}
                       </div>
-                      {isAnnual && (
-                        <div className="text-xs text-green-600 font-medium mt-1">
-                          Billed annually (${formatNumber(projectedPrice * 12)}/year)
+
+                      {/* Savings Callout - Highly Visible */}
+                      {savingsPerUnit && savingsPerUnit > 0 && (
+                        <div className="bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-lg p-3 shadow-md">
+                          <div className="flex items-center gap-2">
+                            <div className="bg-white/20 rounded-full p-1.5">
+                              <DollarSign className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="font-bold text-base">
+                                Save ${formatNumber(savingsPerUnit)} per {terminology.singular}
+                              </div>
+                              <div className="text-xs text-emerald-50">
+                                vs. current pricing — that's ${formatNumber(savingsPerUnit * projectedLocations)} total monthly savings!
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {savingsPerUnit && savingsPerUnit < 0 && (
+                        <div className="bg-amber-100 border border-amber-300 rounded-lg p-2.5">
+                          <div className="flex items-center gap-2 text-sm text-amber-900">
+                            <BarChart3 className="w-4 h-4" />
+                            <span className="font-medium">
+                              ${formatNumber(Math.abs(savingsPerUnit))} more per {terminology.singular} than current pricing
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
-
-                    {savingsPerUnit && savingsPerUnit > 0 && (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-2.5">
-                        <div className="flex items-center gap-2 text-sm text-green-800">
-                          <span className="text-lg">💰</span>
-                          <span className="font-medium">
-                            Save ${formatNumber(savingsPerUnit)} per {selectedPlan === 'ai-advisor' ? 'user' : terminology.singular} vs. current pricing
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {savingsPerUnit && savingsPerUnit < 0 && (
-                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
-                        <div className="flex items-center gap-2 text-sm text-amber-800">
-                          <span className="text-lg">📈</span>
-                          <span className="font-medium">
-                            ${formatNumber(Math.abs(savingsPerUnit))} more per {selectedPlan === 'ai-advisor' ? 'user' : terminology.singular} than current pricing
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               )}
 
@@ -1940,7 +2035,7 @@ function App() {
           terminology={terminology}
           defaultPlanConfigs={DEFAULT_PLAN_CONFIGS}
           quoteMode={quoteMode}
-          quoteId={quoteId}
+          formId={formId}
           quoteStatus={quoteStatus}
           quoteLockedAt={quoteLockedAt}
           quoteAcceptedAt={quoteAcceptedAt}
@@ -1957,6 +2052,10 @@ function App() {
         count={isEnterpriseRequest ? 0 : count}
         planName={isEnterpriseRequest ? "Enterprise" : currentPlan.name}
         unitLabel={selectedPlan === 'ai-advisor' ? 'users' : terminology.plural}
+        estimatedMonthlyMin={Math.round(finalPrice * 0.70)}
+        estimatedMonthlyMax={Math.round(finalPrice * 0.85)}
+        currentMonthlyPrice={Math.round(finalPrice)}
+        isAnnual={isAnnual}
         onUserAction={(action) => {
           sendUserAction(action, {
             userType,
@@ -1995,7 +2094,7 @@ function App() {
           count: count,
           isAnnual: isAnnual,
         }}
-        formUrl={`${window.location.origin}/?uid=${quoteId || ''}&step=pricing`}
+        formUrl={`${window.location.origin}/?formId=${formId || ''}&step=pricing`}
       />
       </div>
     </div>

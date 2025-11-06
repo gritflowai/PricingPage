@@ -1,3 +1,7 @@
+// Edge function for Quote operations
+// Security model: Access control is based on Form ID (UUID) possession
+// Users can only access quotes if they have the specific Form ID (unguessable GUID)
+
 import { createClient } from 'npm:@supabase/supabase-js@2.78.0';
 
 const corsHeaders = {
@@ -7,7 +11,7 @@ const corsHeaders = {
 };
 
 interface Quote {
-  id: string;
+  id: string; // Form ID (UUID) - primary security identifier
   pricing_model_id: string;
   selected_plan: string;
   count: number;
@@ -29,14 +33,14 @@ interface Quote {
 }
 
 interface InitQuoteRequest {
-  id: string;
+  id: string; // Form ID (UUID)
   selected_plan: string;
   count: number;
   is_annual: boolean;
 }
 
 interface UpdateQuoteRequest {
-  id: string;
+  id: string; // Form ID (UUID)
   summary: {
     subtotal: number;
     final_monthly_price: number;
@@ -49,7 +53,7 @@ interface UpdateQuoteRequest {
 }
 
 interface LockQuoteRequest {
-  id: string;
+  id: string; // Form ID (UUID)
   expires_in_days?: number;
 }
 

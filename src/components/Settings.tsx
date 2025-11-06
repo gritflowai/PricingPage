@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings2, X, Plus, AlertCircle, RotateCcw, Unlock } from 'lucide-react';
+import { Settings2, X, Plus, AlertCircle, RotateCcw, Unlock, FileText } from 'lucide-react';
 import { type DiscountType } from '../utils/discountCalculator';
 import { type PlanType, type PlanConfig, type PricingTier } from '../config/planConfigs';
 import type { QuoteStatus } from '../types/quote';
@@ -56,7 +56,7 @@ interface SettingsProps {
   defaultPlanConfigs: Record<PlanType, PlanConfig>;
   // Quote-related props
   quoteMode?: boolean;
-  quoteId?: string | null;
+  formId?: string | null;
   quoteStatus?: QuoteStatus;
   quoteLockedAt?: string | null;
   quoteAcceptedAt?: string | null;
@@ -88,7 +88,7 @@ const Settings: React.FC<SettingsProps> = ({
   terminology = { singular: 'company', plural: 'companies', capitalized: 'Companies' },
   defaultPlanConfigs,
   quoteMode = false,
-  quoteId = null,
+  formId = null,
   quoteStatus = 'draft',
   quoteLockedAt = null,
   quoteAcceptedAt = null,
@@ -281,7 +281,7 @@ const Settings: React.FC<SettingsProps> = ({
   };
 
   const renderQuoteStatusIndicator = () => {
-    if (!quoteMode || !quoteId) return null;
+    if (!quoteMode || !formId) return null;
 
     const getStatusBadge = () => {
       switch (quoteStatus) {
@@ -432,9 +432,30 @@ const Settings: React.FC<SettingsProps> = ({
     </div>
   );
 
+  // Helper function to calculate MRR at a given threshold
+  const calculateMRR = (plan: PlanType, count: number): number => {
+    const config = updatedConfigs[plan];
+    let total = 0;
+
+    // Find the appropriate tier
+    for (const tier of config.pricingTiers) {
+      if (count >= tier.firstUnit && count <= tier.lastUnit) {
+        // Calculate cost for this tier
+        total = tier.flatFee + (count * tier.perUnit);
+        break;
+      }
+    }
+
+    return Math.round(total);
+  };
+
   const renderPlanSettings = (plan: PlanType) => {
     const config = updatedConfigs[plan];
     const stripeUrl = `https://dashboard.stripe.com/acct_1EV6jWFreq0FdVf6/products/${config.stripeProductId}`;
+
+    // Calculate MRR for current thresholds
+    const nudgeMRR = calculateMRR(plan, config.nudgeThreshold);
+    const contactMRR = calculateMRR(plan, config.contactThreshold);
 
     return (
       <div className="space-y-6">
@@ -455,21 +476,50 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
 
           <div className="bg-gray-50 p-4 rounded-lg mb-6">
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Enterprise Contact Threshold</h4>
-            <p className="text-sm text-gray-600 mb-3">
-              Configure when to show the enterprise contact modal for this plan. Users selecting more than this threshold will be prompted to contact sales.
+            <h4 className="text-sm font-medium text-gray-700 mb-3">Lead Capture Thresholds</h4>
+            <p className="text-sm text-gray-600 mb-4">
+              Configure when to show sales nudges and contact requirements. Nudge threshold shows a dismissible banner, contact threshold requires sales consultation for optimal conversion.
             </p>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {plan === 'ai-advisor' ? 'AI Growth Advisor (users)' : `${config.name} Plan (${terminology.plural})`}
-              </label>
-              <input
-                type="number"
-                value={config.contactThreshold}
-                onChange={(e) => updatePlanFeature(plan, 'contactThreshold', Number(e.target.value))}
-                className="w-32 rounded-md border border-gray-300 px-3 py-2"
-                min="1"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Soft Nudge Threshold
+                  <span className="text-xs font-normal text-gray-500 ml-1">(dismissible)</span>
+                </label>
+                <input
+                  type="number"
+                  value={config.nudgeThreshold}
+                  onChange={(e) => updatePlanFeature(plan, 'nudgeThreshold', Number(e.target.value))}
+                  className="w-32 rounded-md border border-gray-300 px-3 py-2"
+                  min="1"
+                  max={config.contactThreshold - 1}
+                />
+                <p className="text-xs text-gray-600 mt-1">
+                  Recommended: $1,500/mo
+                </p>
+                <p className="text-xs font-semibold text-[#1239FF]">
+                  Current: ${nudgeMRR.toLocaleString()}/mo at {config.nudgeThreshold} {plan === 'ai-advisor' ? 'users' : terminology.plural}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Enterprise Contact Threshold
+                  <span className="text-xs font-normal text-gray-500 ml-1">(required)</span>
+                </label>
+                <input
+                  type="number"
+                  value={config.contactThreshold}
+                  onChange={(e) => updatePlanFeature(plan, 'contactThreshold', Number(e.target.value))}
+                  className="w-32 rounded-md border border-gray-300 px-3 py-2"
+                  min="1"
+                />
+                <p className="text-xs text-gray-600 mt-1">
+                  Recommended: $2,000/mo
+                </p>
+                <p className="text-xs font-semibold text-[#1239FF]">
+                  Current: ${contactMRR.toLocaleString()}/mo at {config.contactThreshold} {plan === 'ai-advisor' ? 'users' : terminology.plural}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -762,7 +812,7 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
 
             {/* Quote Lock/Unlock Section */}
-            {quoteMode && quoteId && (
+            {quoteMode && formId && (
               <div className="mt-4 border-t border-gray-200 pt-4">
                 {(quoteStatus === 'locked' || quoteStatus === 'accepted') && onUnlockQuote && (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
@@ -1207,7 +1257,7 @@ Examples:
                   <h4 className="font-medium text-blue-900 mb-3">Preview</h4>
                   <div className="bg-white border border-blue-300 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-blue-600 text-lg">📋</span>
+                      <FileText className="w-5 h-5 text-blue-600 flex-shrink-0" />
                       <span className="font-semibold text-gray-900">{customTermsTitle}</span>
                     </div>
                     <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed border-t border-gray-200 pt-2 pl-7">

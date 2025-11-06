@@ -94,7 +94,7 @@ Customize the pricing calculator behavior using URL parameters:
 - `&admin=true` - **Admin mode for salespeople** (`isAdmin` property - see [Admin Mode](#admin-mode-new) section below)
 - `&plan=growth` - Pre-select a plan (`ai-advisor`, `starter`, `growth`, `scale`)
 - `&count=25` - Pre-fill companies/users count
-- `&projectedLocations=6000` - Show future pricing projection at specified count (displays "what you'll pay at scale")
+- `&projectedLocations=6000` - **[Quote Mode Only]** Show future pricing projection at specified count (displays "what you'll pay at scale")
 - `&annual=true` - Pre-select annual billing (`true` or `false`)
 - `&discountType=percentage` - Pre-apply a discount type (`percentage` or `fixed`)
 - `&discountValue=15` - Pre-apply discount value (percentage as number or dollar amount)
@@ -134,17 +134,19 @@ Customize the pricing calculator behavior using URL parameters:
 ></iframe>
 ```
 
-### Example: With Projected Pricing (Future Growth Scenario)
+### Example: With Projected Pricing (Quote Mode Only)
 ```html
-<!-- Show current pricing for 130 pilot locations + future pricing for 6,000 locations at scale -->
+<!-- QUOTE MODE ONLY: Show current pricing for 130 pilot locations + future pricing for 6,000 locations at scale -->
 <iframe
-  src="https://your-url.com?embedded=true&theme=transparent&userType=franchisee&count=130&projectedLocations=6000&annual=true"
+  src="https://your-url.com?mode=quote&embedded=true&theme=transparent&userType=franchisee&count=130&projectedLocations=6000&annual=true"
   width="100%"
   height="800"
 ></iframe>
 ```
 
-**Use Case:** Perfect for sales presentations where customers need to understand pricing as they scale. For example, showing UPS that their 130-location pilot will cost $X/month, while their future 6,000-location rollout will cost $Y/month with volume discounts.
+**Important:** The `projectedLocations` parameter only works in **Quote Mode** (`mode=quote`). This feature is designed specifically for quote presentations where customers need to understand long-term pricing commitments.
+
+**Use Case:** Perfect for sales quote presentations where customers need to lock in pricing while understanding what they'll pay as they scale. For example, showing UPS a quote for their 130-location pilot that also projects what they'll pay at 6,000 locations with volume discounts. The projected pricing is saved with the quote and persists when the customer reopens their quote link.
 
 ## Message Types & Data Structures
 

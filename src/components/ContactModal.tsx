@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Calendar, Users, Zap, Shield, Mail } from 'lucide-react';
+import { X, Calendar, Users, Zap, Shield, Mail, TrendingDown, CreditCard } from 'lucide-react';
 
 // Add TypeScript declarations for Apollo Meetings API
 declare global {
@@ -30,6 +30,11 @@ interface ContactModalProps {
   };
   // Optional: callback for sending iframe messages
   onUserAction?: (action: 'CONTACT_SALES' | 'SCHEDULE_MEETING') => void;
+  // Optional: pricing estimates for conversion optimization
+  estimatedMonthlyMin?: number;
+  estimatedMonthlyMax?: number;
+  currentMonthlyPrice?: number;
+  isAnnual?: boolean;
 }
 
 const ContactModal: React.FC<ContactModalProps> = ({
@@ -39,7 +44,11 @@ const ContactModal: React.FC<ContactModalProps> = ({
   planName,
   unitLabel,
   userData,
-  onUserAction
+  onUserAction,
+  estimatedMonthlyMin,
+  estimatedMonthlyMax,
+  currentMonthlyPrice,
+  isAnnual
 }) => {
   const [showSchedulingForm, setShowSchedulingForm] = useState(false);
   const [apolloInitialized, setApolloInitialized] = useState(false);
@@ -121,8 +130,14 @@ const ContactModal: React.FC<ContactModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-auto overflow-hidden">
+    <div
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-auto overflow-hidden max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Show scheduling form or main content */}
         {showSchedulingForm ? (
           <>
@@ -239,78 +254,80 @@ const ContactModal: React.FC<ContactModalProps> = ({
               >
                 <X className="w-5 h-5" />
               </button>
-              <h2 className="text-2xl font-bold mb-2">Enterprise Pricing</h2>
-              <p className="text-white/90">
+              <h2 className="text-2xl font-bold mb-2">
                 {count === 0
-                  ? "Unlock unlimited scale with custom enterprise solutions"
-                  : `Unlock custom pricing for ${count}+ ${unitLabel}`}
+                  ? "Let's Design Your Custom Plan"
+                  : `Custom Pricing for ${count} ${unitLabel.charAt(0).toUpperCase() + unitLabel.slice(1)}`}
+              </h2>
+              <p className="text-white/90 text-lg">
+                Get your custom quote on the call
               </p>
             </div>
 
             <div className="p-6">
-              <p className="text-gray-600 mb-6">
-                {count === 0
-                  ? <>You're interested in our <strong>Enterprise</strong> solution. Let's discuss how we can build a custom package that scales with your business.</>
-                  : <>You've selected <strong>{count} {unitLabel}</strong> for the <strong>{planName}</strong> plan. Let's discuss a custom enterprise solution tailored to your specific needs.</>}
-              </p>
+              {/* Estimated Pricing Range Preview - Compact */}
+              {estimatedMonthlyMin && estimatedMonthlyMax && currentMonthlyPrice && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 mb-5 border-2 border-blue-200">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-[#1239FF] mb-1">
+                      ${estimatedMonthlyMin.toLocaleString()} - ${estimatedMonthlyMax.toLocaleString()}<span className="text-base text-gray-600 font-normal">/mo</span>
+                    </div>
+                    <div className="inline-block bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-semibold">
+                      Save up to ${(currentMonthlyPrice - estimatedMonthlyMin).toLocaleString()}/mo
+                    </div>
+                    <p className="text-xs text-gray-600 mt-2">Estimated enterprise pricing • Custom volume discounts available</p>
+                  </div>
+                </div>
+              )}
 
-              {/* Benefits */}
-              <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                <h3 className="font-semibold text-gray-900 mb-3">Enterprise Benefits Include:</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex items-start gap-2">
-                    <Zap className="w-4 h-4 text-[#1239FF] mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-700">Custom integrations</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Users className="w-4 h-4 text-[#1239FF] mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-700">Dedicated support</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Shield className="w-4 h-4 text-[#1239FF] mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-700">Enhanced security</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Calendar className="w-4 h-4 text-[#1239FF] mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-700">Volume discounts</span>
-                  </div>
+              {/* Benefits - Compact Grid */}
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2">
+                  <TrendingDown className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  <span className="text-xs font-medium text-gray-800">Save 15-30%</span>
+                </div>
+                <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2">
+                  <Users className="w-4 h-4 text-[#1239FF] flex-shrink-0" />
+                  <span className="text-xs font-medium text-gray-800">Dedicated support</span>
+                </div>
+                <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2">
+                  <Shield className="w-4 h-4 text-[#1239FF] flex-shrink-0" />
+                  <span className="text-xs font-medium text-gray-800">Custom integrations</span>
+                </div>
+                <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2">
+                  <CreditCard className="w-4 h-4 text-[#1239FF] flex-shrink-0" />
+                  <span className="text-xs font-medium text-gray-800">Flexible terms</span>
                 </div>
               </div>
 
-              {/* CTAs */}
-              <div className="space-y-3">
+              {/* CTAs - Streamlined */}
+              <div className="space-y-2">
                 <button
                   onClick={handleScheduleClick}
                   disabled={!apolloInitialized}
-                  className="flex items-center justify-center gap-2 w-full bg-[#1239FF] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#0F2DB8] transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center justify-center gap-2 w-full bg-[#1239FF] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#0F2DB8] transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
                 >
                   <Calendar className="w-5 h-5" />
-                  Schedule a Call
+                  Get My Custom Quote
                 </button>
+                <p className="text-center text-xs text-gray-500">15-min call • Quote delivered live</p>
 
-                <button
-                  onClick={onClose}
-                  className="w-full bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition-all"
-                >
-                  Continue with Standard Pricing
-                </button>
-              </div>
-
-              {/* Contact Options */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <p className="text-sm text-gray-600 text-center mb-3">
-                  <strong>Need more details?</strong> Schedule a meeting, email us, or chat with us:
-                </p>
-                <div className="flex justify-center">
-                  <a
-                    href="mailto:EnterprisePlan@autymate.com"
-                    className="group flex items-center gap-3 px-6 py-3 bg-blue-50 hover:bg-blue-100 border-2 border-[#1239FF] rounded-lg transition-all transform hover:scale-[1.02]"
+                <div className="pt-2 border-t border-gray-200">
+                  <button
+                    onClick={onClose}
+                    className="w-full text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-all"
                   >
-                    <Mail className="w-5 h-5 text-[#1239FF]" />
-                    <div className="text-left">
-                      <div className="text-xs text-gray-600 font-medium">Click to email us:</div>
-                      <div className="text-base font-bold text-[#1239FF] group-hover:text-[#0F2DB8] transition-colors">
-                        EnterprisePlan@autymate.com
+                    Continue with Standard Pricing
+                  </button>
+                  <a
+                    href="mailto:quotes@autymate.com"
+                    className="flex items-center justify-center gap-2 mt-3 px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-[#1239FF] rounded-lg hover:from-blue-100 hover:to-indigo-100 transition-all group"
+                  >
+                    <Mail className="w-5 h-5 text-[#1239FF] group-hover:scale-110 transition-transform" />
+                    <div className="text-center">
+                      <div className="text-xs font-medium text-gray-700">Click to email us:</div>
+                      <div className="text-sm font-bold text-[#1239FF] group-hover:underline">
+                        quotes@autymate.com
                       </div>
                     </div>
                   </a>

@@ -19,6 +19,7 @@ export interface PlanConfig {
   aiTokensPerDollar: number;
   historicDataYears: number;
   contactThreshold: number;
+  nudgeThreshold: number;
   stripeProductId: string;
   features: {
     dailySync: boolean;
@@ -75,7 +76,8 @@ export const DEFAULT_PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
     metricsPerScorecard: 999,
     aiTokensPerDollar: 166666,
     historicDataYears: 0,
-    contactThreshold: 50,
+    contactThreshold: 200,
+    nudgeThreshold: 150,
     stripeProductId: 'prod_7YtGm3ZhA2kR1Q5B',
     features: {
       dailySync: false,
@@ -93,7 +95,8 @@ export const DEFAULT_PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
     metricsPerScorecard: 10,
     aiTokensPerDollar: 166666,
     historicDataYears: 2,
-    contactThreshold: 50,
+    contactThreshold: 51,
+    nudgeThreshold: 31,
     stripeProductId: 'prod_9WlNx5UpL8dC4V6M',
     features: {
       dailySync: true,
@@ -111,7 +114,8 @@ export const DEFAULT_PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
     metricsPerScorecard: 15,
     aiTokensPerDollar: 166666,
     historicDataYears: 3,
-    contactThreshold: 50,
+    contactThreshold: 17,
+    nudgeThreshold: 11,
     stripeProductId: 'prod_3QpHz8EvN1sB7K2X',
     features: {
       dailySync: true,
@@ -129,7 +133,8 @@ export const DEFAULT_PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
     metricsPerScorecard: 15,
     aiTokensPerDollar: 166666,
     historicDataYears: 4,
-    contactThreshold: 50,
+    contactThreshold: 6,
+    nudgeThreshold: 4,
     stripeProductId: 'prod_6RtKx2JmF4aL9D7T',
     features: {
       dailySync: true,
