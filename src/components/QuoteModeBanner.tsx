@@ -19,10 +19,20 @@ export function QuoteModeBanner({ status, expiresAt, lockedAt, onScheduleMeeting
       <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded-r-lg">
         <div className="flex items-center gap-3">
           <Clock className="w-5 h-5 text-blue-600 flex-shrink-0" />
-          <div>
+          <div className="flex-1">
             <p className="font-medium text-blue-900">Quote in Progress</p>
             <p className="text-sm text-blue-700">Changes are being saved automatically</p>
           </div>
+          {onScheduleMeeting && (
+            <button
+              onClick={onScheduleMeeting}
+              className="flex items-center gap-2 px-4 py-2 bg-[#1239FF] text-white rounded-lg text-sm font-semibold hover:bg-[#0F2DB8] transition-all hover:scale-105 shadow-md"
+            >
+              <Calendar className="w-4 h-4" />
+              <span className="hidden sm:inline">Book a Call to Discuss</span>
+              <span className="sm:hidden">Discuss Quote</span>
+            </button>
+          )}
         </div>
       </div>
     )
@@ -92,6 +102,16 @@ export function QuoteModeBanner({ status, expiresAt, lockedAt, onScheduleMeeting
               {lockedAt && daysRemaining > 7 && ` • Locked ${formatDistanceToNow(new Date(lockedAt), { addSuffix: true })}`}
             </p>
           </div>
+          {onScheduleMeeting && (
+            <button
+              onClick={onScheduleMeeting}
+              className="flex items-center gap-2 px-4 py-2 bg-[#1239FF] text-white rounded-lg text-sm font-semibold hover:bg-[#0F2DB8] transition-all hover:scale-105 shadow-md"
+            >
+              <Calendar className="w-4 h-4" />
+              <span className="hidden sm:inline">Book a Call to Discuss</span>
+              <span className="sm:hidden">Discuss Quote</span>
+            </button>
+          )}
         </div>
       </div>
     )
@@ -150,7 +170,7 @@ export function QuoteModeBanner({ status, expiresAt, lockedAt, onScheduleMeeting
                 </button>
 
                 <a
-                  href="mailto:EnterprisePlan@autymate.com?subject=Expired Quote - Need Updated Pricing"
+                  href="mailto:quotes@autymate.com?subject=Expired Quote - Need Updated Pricing"
                   className="flex items-center justify-center gap-2 w-full bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition-all"
                 >
                   <Mail className="w-5 h-5" />
@@ -165,10 +185,10 @@ export function QuoteModeBanner({ status, expiresAt, lockedAt, onScheduleMeeting
                 </p>
                 <p className="text-sm text-center">
                   <a
-                    href="mailto:EnterprisePlan@autymate.com"
+                    href="mailto:quotes@autymate.com"
                     className="text-[#1239FF] hover:text-[#0F2DB8] font-medium"
                   >
-                    EnterprisePlan@autymate.com
+                    quotes@autymate.com
                   </a>
                 </p>
               </div>
