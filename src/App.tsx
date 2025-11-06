@@ -315,6 +315,7 @@ function App() {
   const [quoteLockedAt, setQuoteLockedAt] = useState<string | null>(null);
   const [quoteAcceptedAt, setQuoteAcceptedAt] = useState<string | null>(null);
   const [currentPricingModelId, setCurrentPricingModelId] = useState<string | null>(null);
+  const [waitingForInit, setWaitingForInit] = useState(false);
 
   // Admin mode state (for salespeople)
   const [adminMode, setAdminMode] = useState(embedConfig.adminMode);
@@ -471,83 +472,108 @@ function App() {
     setNudgeBannerDismissed(false);
   }, [selectedPlan]);
 
-  // Quote mode initialization
+  // Quote mode initialization - Two-phase approach
   useEffect(() => {
     if (!quoteMode) return;
 
     const initializeQuote = async () => {
       try {
         if (formId) {
-          // Load existing quote
-          const existingQuote = await quoteApi.getQuote(formId);
+          // Phase 1: Try to load existing quote
+          try {
+            console.log('[PricingCalculator] Attempting to load existing quote for formId:', formId);
+            const existingQuote = await quoteApi.getQuote(formId);
 
-          // Update state from loaded quote
-          setQuoteStatus(existingQuote.status);
-          setQuoteExpiresAt(existingQuote.expires_at);
-          setQuoteLockedAt(existingQuote.locked_at);
-          setQuoteAcceptedAt(existingQuote.accepted_at || null);
-          setCurrentPricingModelId(existingQuote.pricing_model_id);
+            // Successfully loaded existing quote
+            console.log('[PricingCalculator] Loaded existing quote:', existingQuote.id);
 
-          // Set selections from quote
-          if (existingQuote.selected_plan) {
-            setSelectedPlan(existingQuote.selected_plan as PlanType);
-          }
-          if (existingQuote.count) {
-            setCount(existingQuote.count);
-          }
-          if (existingQuote.is_annual !== undefined) {
-            setIsAnnual(existingQuote.is_annual);
-          }
+            // Update state from loaded quote
+            setQuoteStatus(existingQuote.status);
+            setQuoteExpiresAt(existingQuote.expires_at);
+            setQuoteLockedAt(existingQuote.locked_at);
+            setQuoteAcceptedAt(existingQuote.accepted_at || null);
+            setCurrentPricingModelId(existingQuote.pricing_model_id);
 
-          // Restore settings from selection_raw
-          if (existingQuote.selection_raw) {
-            const raw = existingQuote.selection_raw as any;
-
-            // Restore projected locations
-            if (raw.projectedLocations) {
-              setProjectedLocations(raw.projectedLocations);
-            } else {
-              setProjectedLocations(null);
+            // Set selections from quote
+            if (existingQuote.selected_plan) {
+              setSelectedPlan(existingQuote.selected_plan as PlanType);
+            }
+            if (existingQuote.count) {
+              setCount(existingQuote.count);
+            }
+            if (existingQuote.is_annual !== undefined) {
+              setIsAnnual(existingQuote.is_annual);
             }
 
-            // Restore custom discount
-            if (raw.customDiscount) {
-              setCustomDiscountType(raw.customDiscount.type || null);
-              setCustomDiscountValue(raw.customDiscount.value || 0);
-              setCustomDiscountLabel(raw.customDiscount.label || '');
-              setCustomDiscountReason(raw.customDiscount.reason || '');
-            } else {
-              // Clear custom discount if not in quote
-              setCustomDiscountType(null);
-              setCustomDiscountValue(0);
-              setCustomDiscountLabel('');
-              setCustomDiscountReason('');
+            // Restore settings from selection_raw
+            if (existingQuote.selection_raw) {
+              const raw = existingQuote.selection_raw as any;
+
+              // Restore projected locations
+              if (raw.projectedLocations) {
+                setProjectedLocations(raw.projectedLocations);
+              } else {
+                setProjectedLocations(null);
+              }
+
+              // Restore custom discount
+              if (raw.customDiscount) {
+                setCustomDiscountType(raw.customDiscount.type || null);
+                setCustomDiscountValue(raw.customDiscount.value || 0);
+                setCustomDiscountLabel(raw.customDiscount.label || '');
+                setCustomDiscountReason(raw.customDiscount.reason || '');
+              } else {
+                // Clear custom discount if not in quote
+                setCustomDiscountType(null);
+                setCustomDiscountValue(0);
+                setCustomDiscountLabel('');
+                setCustomDiscountReason('');
+              }
+
+              // Restore royalty processing
+              if (raw.royaltyProcessing) {
+                setRoyaltyProcessingEnabled(raw.royaltyProcessing.enabled || false);
+                setRoyaltyBaseFee(raw.royaltyProcessing.baseFee || 0);
+                setRoyaltyPerTransaction(raw.royaltyProcessing.perTransaction || 1.82);
+                setEstimatedTransactions(raw.royaltyProcessing.estimatedTransactions || 2);
+              } else {
+                // Clear royalty processing if not in quote
+                setRoyaltyProcessingEnabled(false);
+                setRoyaltyBaseFee(0);
+                setRoyaltyPerTransaction(1.82);
+                setEstimatedTransactions(2);
+              }
+
+              // Restore onboarding fee
+              if (raw.onboardingFee) {
+                setOnboardingFeeAmount(raw.onboardingFee.amount || 0);
+                setOnboardingFeeTitle(raw.onboardingFee.title || 'Custom Onboarding Fee');
+                setOnboardingFeeDescription(raw.onboardingFee.description || 'Setup sCOA, hierarchy, benchmarking, KPI reporting and forecasting, and setup custom scorecards. This is white-glove onboarding with dedicated support to ensure your success from day one.');
+              } else {
+                // Clear onboarding fee if not in quote
+                setOnboardingFeeAmount(0);
+                setOnboardingFeeTitle('Custom Onboarding Fee');
+                setOnboardingFeeDescription('Setup sCOA, hierarchy, benchmarking, KPI reporting and forecasting, and setup custom scorecards. This is white-glove onboarding with dedicated support to ensure your success from day one.');
+              }
             }
 
-            // Restore royalty processing
-            if (raw.royaltyProcessing) {
-              setRoyaltyProcessingEnabled(raw.royaltyProcessing.enabled || false);
-              setRoyaltyBaseFee(raw.royaltyProcessing.baseFee || 0);
-              setRoyaltyPerTransaction(raw.royaltyProcessing.perTransaction || 1.82);
-              setEstimatedTransactions(raw.royaltyProcessing.estimatedTransactions || 2);
-            } else {
-              // Clear royalty processing if not in quote
-              setRoyaltyProcessingEnabled(false);
-              setRoyaltyBaseFee(0);
-              setRoyaltyPerTransaction(1.82);
-              setEstimatedTransactions(2);
-            }
+            // Send QUOTE_ID_READY to parent after successful load
+            sendQuoteMessage('QUOTE_ID_READY', {
+              id: formId,
+              status: existingQuote.status,
+              version: existingQuote.version || 1,
+            });
 
-            // Restore onboarding fee
-            if (raw.onboardingFee) {
-              setOnboardingFeeAmount(raw.onboardingFee.amount || 0);
-              setOnboardingFeeTitle(raw.onboardingFee.title || 'Custom Onboarding Fee');
-              setOnboardingFeeDescription(raw.onboardingFee.description || 'Setup sCOA, hierarchy, benchmarking, KPI reporting and forecasting, and setup custom scorecards. This is white-glove onboarding with dedicated support to ensure your success from day one.');
+            console.log('[PricingCalculator] Quote loaded successfully, sent QUOTE_ID_READY');
+          } catch (error: any) {
+            // Phase 2: Quote doesn't exist - wait for INIT_QUOTE message
+            if (error?.message?.includes('Quote not found') || error?.message?.includes('404')) {
+              console.log('[PricingCalculator] Quote not found, waiting for INIT_QUOTE message from parent...');
+              setWaitingForInit(true);
+              // Don't send error - this is expected for new quotes
             } else {
-              // Clear onboarding fee if not in quote
-              setOnboardingFeeAmount(0);
-              setOnboardingFeeTitle('Custom Onboarding Fee');
-              setOnboardingFeeDescription('Setup sCOA, hierarchy, benchmarking, KPI reporting and forecasting, and setup custom scorecards. This is white-glove onboarding with dedicated support to ensure your success from day one.');
+              // Real error (network, etc.) - report it
+              throw error;
             }
           }
         } else {
@@ -562,7 +588,7 @@ function App() {
           return;
         }
       } catch (error) {
-        console.error('Failed to initialize quote:', error);
+        console.error('[PricingCalculator] Failed to initialize quote:', error);
         sendQuoteError(
           error instanceof Error ? error.message : 'Failed to initialize quote',
           'UNKNOWN',
@@ -1091,6 +1117,107 @@ function App() {
     console.log('[PricingCalculator] Admin mode set to:', enabled);
   }, [incomingMessage]);
 
+  // Handle incoming INIT_QUOTE message from parent
+  useEffect(() => {
+    if (!incomingMessage || incomingMessage.type !== 'INIT_QUOTE') return;
+    if (!formId || !waitingForInit) return;
+
+    const initializeNewQuote = async () => {
+      try {
+        console.log('[PricingCalculator] Received INIT_QUOTE message, creating new quote...');
+        const data = incomingMessage.data;
+
+        // Create new quote in database
+        const newQuote = await quoteApi.initQuote({
+          id: formId,
+          selected_plan: data?.selectedPlan || selectedPlan,
+          count: data?.count || count,
+          is_annual: data?.isAnnual ?? isAnnual,
+        });
+
+        console.log('[PricingCalculator] Created new quote:', newQuote.id);
+
+        // Update state from initialized quote
+        setQuoteStatus(data?.status || 'draft');
+        setCurrentPricingModelId(newQuote.pricing_model_id || null);
+        setWaitingForInit(false);
+
+        // Apply selections from INIT_QUOTE data
+        if (data?.selectedPlan) {
+          setSelectedPlan(data.selectedPlan as PlanType);
+        }
+        if (data?.count !== undefined) {
+          setCount(data.count);
+        }
+        if (data?.isAnnual !== undefined) {
+          setIsAnnual(data.isAnnual);
+        }
+
+        // Apply custom discount if provided
+        if (data?.customDiscount) {
+          setCustomDiscountType(data.customDiscount.type);
+          setCustomDiscountValue(data.customDiscount.value);
+          setCustomDiscountLabel(data.customDiscount.label);
+          setCustomDiscountReason(data.customDiscount.reason || '');
+        }
+
+        // Apply royalty processing if provided
+        if (data?.royaltyProcessing) {
+          setRoyaltyProcessingEnabled(data.royaltyProcessing.enabled);
+          setRoyaltyBaseFee(data.royaltyProcessing.baseFee);
+          setRoyaltyPerTransaction(data.royaltyProcessing.perTransaction);
+          setEstimatedTransactions(data.royaltyProcessing.estimatedTransactions);
+        }
+
+        // Apply onboarding fee if provided
+        if (data?.onboardingFee) {
+          setOnboardingFeeAmount(data.onboardingFee.amount);
+          setOnboardingFeeTitle(data.onboardingFee.title);
+          setOnboardingFeeDescription(data.onboardingFee.description);
+        }
+
+        // Apply custom terms if provided
+        if (data?.customTerms) {
+          setCustomTermsEnabled(data.customTerms.enabled);
+          setCustomTermsTitle(data.customTerms.title);
+          setCustomTermsContent(data.customTerms.content);
+        }
+
+        // Apply projected locations if provided
+        if (data?.projectedLocations !== undefined) {
+          setProjectedLocations(data.projectedLocations);
+        }
+
+        // Apply locked/expires dates if provided
+        if (data?.lockedAt) {
+          setQuoteLockedAt(data.lockedAt);
+        }
+        if (data?.expiresAt) {
+          setQuoteExpiresAt(data.expiresAt);
+        }
+
+        // Send QUOTE_ID_READY to parent
+        sendQuoteMessage('QUOTE_ID_READY', {
+          id: formId,
+          status: 'draft',
+          version: 1,
+        });
+
+        console.log('[PricingCalculator] Quote initialized successfully, sent QUOTE_ID_READY');
+      } catch (error) {
+        console.error('[PricingCalculator] Failed to initialize quote from INIT_QUOTE:', error);
+        sendQuoteError(
+          error instanceof Error ? error.message : 'Failed to initialize quote',
+          'UNKNOWN',
+          { formId, error }
+        );
+        setWaitingForInit(false);
+      }
+    };
+
+    initializeNewQuote();
+  }, [incomingMessage, formId, waitingForInit, selectedPlan, count, isAnnual, sendQuoteMessage, sendQuoteError]);
+
   // Copy share link to clipboard
   const handleCopyShareLink = async () => {
     if (!formId) return;
@@ -1125,6 +1252,25 @@ function App() {
     <div className={`${minHeight} ${backgroundColor}`}>
       {/* Form ID Error Banner - shown at very top when in quote mode without formId */}
       <FormIdErrorBanner show={quoteMode && !formId} />
+
+      {/* Initialization Loading Banner - shown when waiting for INIT_QUOTE */}
+      {waitingForInit && (
+        <div className="bg-blue-50 border-b-2 border-blue-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex items-center gap-3">
+              <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-blue-800">
+                  Initializing quote...
+                </p>
+                <p className="text-xs text-blue-600 mt-0.5">
+                  Waiting for quote data from parent application
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Role Selector at the very top */}
       <RoleSelector selected={userType} onChange={setUserType} isEmbedded={embedConfig.isEmbedded} />

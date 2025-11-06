@@ -89,11 +89,41 @@ export interface IframeMessage {
 
 // Incoming message types from parent window
 export interface IncomingMessage {
-  type: 'CONFIRM_QUOTE_ACCEPTANCE' | 'SET_ADMIN_MODE';
+  type: 'CONFIRM_QUOTE_ACCEPTANCE' | 'SET_ADMIN_MODE' | 'INIT_QUOTE';
   data?: {
     id?: string;
     acceptedAt?: string;
     enabled?: boolean;
+    // INIT_QUOTE data fields
+    selectedPlan?: string;
+    count?: number;
+    isAnnual?: boolean;
+    status?: 'draft' | 'locked' | 'accepted' | 'expired';
+    customDiscount?: {
+      type: 'percentage' | 'fixed';
+      value: number;
+      label: string;
+      reason: string;
+    };
+    royaltyProcessing?: {
+      enabled: boolean;
+      baseFee: number;
+      perTransaction: number;
+      estimatedTransactions: number;
+    };
+    onboardingFee?: {
+      amount: number;
+      title: string;
+      description: string;
+    };
+    customTerms?: {
+      enabled: boolean;
+      title: string;
+      content: string;
+    };
+    projectedLocations?: number | null;
+    lockedAt?: string;
+    expiresAt?: string;
   };
 }
 
@@ -229,7 +259,9 @@ export const useIframeMessaging = (options: UseIframeMessagingOptions = {}) => {
       });
 
       // Handle known incoming message types
-      if (event.data.type === 'CONFIRM_QUOTE_ACCEPTANCE' || event.data.type === 'SET_ADMIN_MODE') {
+      if (event.data.type === 'CONFIRM_QUOTE_ACCEPTANCE' ||
+          event.data.type === 'SET_ADMIN_MODE' ||
+          event.data.type === 'INIT_QUOTE') {
         setIncomingMessage(event.data as IncomingMessage);
       }
     };
