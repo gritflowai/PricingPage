@@ -71,7 +71,19 @@ Use the provided deployment script:
    supabase functions deploy quotes
    ```
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
+See [docs/guides/DEPLOYMENT.md](docs/guides/DEPLOYMENT.md) for detailed deployment instructions.
+
+## Documentation
+
+📚 **[Complete Documentation Index](docs/README.md)**
+
+### Quick Links
+- 🚀 [Quickstart Guide](docs/guides/QUICKSTART.md) - Get running in 5 minutes
+- 🔌 [Sync Embedding Guide](docs/api/SYNC_EMBEDDING.md) - Integrate calculator with your app
+- 📖 [API Reference](docs/api/API.md) - REST API endpoints
+- 💰 [Pricing Configuration](docs/reference/PRICING.md) - Update pricing tiers
+- ⚙️ [Quote Settings](docs/guides/QUOTE_SETTINGS.md) - Configure discounts and fees
+- 🏗️ [Architecture Guide](docs/architecture/CLAUDE.md) - System design and structure
 
 ## Project Structure
 
@@ -87,9 +99,11 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
 │   └── functions/      # Edge functions (serverless)
 │       ├── pricing-models/
 │       └── quotes/
-├── API.md              # API documentation
-├── DEPLOYMENT.md       # Deployment guide
-└── CLAUDE.md           # Claude Code instructions
+└── docs/               # 📚 Documentation
+    ├── api/            # API & integration guides
+    ├── guides/         # How-to guides
+    ├── reference/      # Reference material
+    └── architecture/   # System design
 ```
 
 ## Architecture
@@ -110,7 +124,7 @@ npm run lint     # Run ESLint
 
 ## API Endpoints
 
-See [API.md](API.md) for complete API documentation.
+See [docs/api/API.md](docs/api/API.md) for complete API documentation.
 
 **Base URL:** `https://ijlpiwxodfsjmexktcoc.supabase.co/functions/v1`
 
