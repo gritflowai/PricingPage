@@ -383,10 +383,12 @@ function App() {
     ? (royaltyBaseFee * count) + (royaltyPerTransaction * estimatedTransactions * count)
     : 0;
 
-  // Final price includes royalty processing
-  const finalPriceWithRoyalty = finalPrice + royaltyProcessingFee;
+  // Subscription pricing (used for per-unit and scaling calculations)
+  const subscriptionPrice = finalPrice;
+  const subscriptionPricePerUnit = subscriptionPrice / count;
 
-  const pricePerUnit = finalPriceWithRoyalty / count;
+  // Grand total includes subscription + optional add-ons (used for quotes/checkout)
+  const grandTotal = subscriptionPrice + royaltyProcessingFee;
 
   // Calculate AI tokens dynamically based on final price
   const calculatedAiTokens = Math.round(finalPrice * currentPlan.aiTokensPerDollar);
@@ -427,17 +429,13 @@ function App() {
     const projectedPriceAfterDiscounts = projectedTotalPrice - projectedCustomDiscountAmount - projectedWholesaleDiscountAmount;
     const projectedFinalPrice = isAnnual ? projectedPriceAfterDiscounts * (10/12) : projectedPriceAfterDiscounts;
 
-    // Apply royalty processing fees (if enabled)
-    const projectedRoyaltyFee = royaltyProcessingEnabled
-      ? (royaltyBaseFee * projectedCount) + (royaltyPerTransaction * estimatedTransactions * projectedCount)
-      : 0;
-
-    return projectedFinalPrice + projectedRoyaltyFee;
+    // Return subscription-only price (royalty fees excluded from scaling comparisons)
+    return projectedFinalPrice;
   };
 
   const projectedPrice = projectedLocations ? calculateProjectedPrice(projectedLocations) : null;
   const projectedPricePerUnit = projectedPrice && projectedLocations ? projectedPrice / projectedLocations : null;
-  const savingsPerUnit = projectedPricePerUnit ? pricePerUnit - projectedPricePerUnit : null;
+  const savingsPerUnit = projectedPricePerUnit ? subscriptionPricePerUnit - projectedPricePerUnit : null;
 
   // Determine if controls should be disabled (locked, accepted, or expired)
   const isLocked = quoteMode && (quoteStatus === 'locked' || quoteStatus === 'accepted' || quoteStatus === 'expired');
@@ -608,8 +606,9 @@ function App() {
         selectedPlan,
         count,
         isAnnual,
-        finalPrice: finalPriceWithRoyalty,
-        pricePerUnit,
+        finalPrice: grandTotal,
+        subscriptionPrice: subscriptionPrice,
+        subscriptionPricePerUnit: subscriptionPricePerUnit,
         totalPrice,
         monthlySavings,
         wholesaleDiscountAmount,
@@ -639,8 +638,9 @@ function App() {
           customDiscount: customDiscountAmount,
           wholesaleDiscount: wholesaleDiscountAmount,
           annualSavings: monthlySavings,
+          subscriptionPrice: subscriptionPrice,
           royaltyProcessingFee: royaltyProcessingFee,
-          finalMonthlyPrice: finalPriceWithRoyalty
+          finalMonthlyPrice: grandTotal
         },
         planDetails: {
           name: currentPlan.name,
@@ -659,8 +659,9 @@ function App() {
     count,
     isAnnual,
     finalPrice,
-    finalPriceWithRoyalty,
-    pricePerUnit,
+    subscriptionPrice,
+    grandTotal,
+    subscriptionPricePerUnit,
     totalPrice,
     monthlySavings,
     wholesaleDiscountAmount,
@@ -695,8 +696,9 @@ function App() {
       try {
         const summary: QuoteSummary = {
           subtotal: totalPrice,
-          final_monthly_price: finalPriceWithRoyalty,
-          price_per_unit: pricePerUnit,
+          final_monthly_price: grandTotal,
+          subscription_price: subscriptionPrice,
+          subscription_price_per_unit: subscriptionPricePerUnit,
           annual_savings: monthlySavings,
           price_breakdown: {
             subtotal: totalPrice,
@@ -704,8 +706,9 @@ function App() {
             customDiscount: customDiscountAmount,
             wholesaleDiscount: wholesaleDiscountAmount,
             annualSavings: monthlySavings,
+            subscriptionPrice: subscriptionPrice,
             royaltyProcessingFee: royaltyProcessingFee,
-            finalMonthlyPrice: finalPriceWithRoyalty,
+            finalMonthlyPrice: grandTotal,
           },
           plan_details: {
             name: currentPlan.name,
@@ -784,8 +787,9 @@ function App() {
     isAnnual,
     projectedLocations,
     totalPrice,
-    finalPriceWithRoyalty,
-    pricePerUnit,
+    subscriptionPrice,
+    grandTotal,
+    subscriptionPricePerUnit,
     monthlySavings,
     customDiscountAmount,
     wholesaleDiscountAmount,
@@ -1489,16 +1493,16 @@ function App() {
               <div className="p-3">
               {/* Simplified Price Display */}
               <div className="text-center py-4">
-                <div className="text-4xl md:text-5xl font-bold gradient-text-primary mb-2 animate-count" role="status" aria-live="polite" aria-label={`Price: $${formatNumber(finalPriceWithRoyalty)} per month`}>
-                  ${formatNumber(finalPriceWithRoyalty)}
+                <div className="text-4xl md:text-5xl font-bold gradient-text-primary mb-2 animate-count" role="status" aria-live="polite" aria-label={`Price: $${formatNumber(subscriptionPrice)} per month`}>
+                  ${formatNumber(subscriptionPrice)}
                   <span className="text-lg md:text-xl font-normal text-[#180D43]/70">/mo</span>
                 </div>
                 <div className="text-base md:text-lg text-[#180D43]/80 mb-1">
-                  {count} {selectedPlan === 'ai-advisor' ? 'users' : terminology.plural} • <span className="font-semibold text-[#1239FF]">${formatNumber(pricePerUnit)}</span> each
+                  {count} {selectedPlan === 'ai-advisor' ? 'users' : terminology.plural} • <span className="font-semibold text-[#1239FF]">${formatNumber(subscriptionPricePerUnit)}</span> each
                 </div>
                 {isAnnual && (
                   <div className="text-xs md:text-sm text-green-600 font-medium">
-                    Billed annually (${formatNumber(finalPriceWithRoyalty * 12)}/year)
+                    Billed annually (${formatNumber(subscriptionPrice * 12)}/year)
                   </div>
                 )}
               </div>
@@ -1646,8 +1650,9 @@ function App() {
                           selectedPlan,
                           count,
                           isAnnual,
-                          finalPrice: finalPriceWithRoyalty,
-                          pricePerUnit,
+                          finalPrice: grandTotal,
+                          subscriptionPrice: subscriptionPrice,
+                          subscriptionPricePerUnit: subscriptionPricePerUnit,
                           totalPrice,
                           monthlySavings,
                           wholesaleDiscountAmount,
@@ -1845,29 +1850,43 @@ function App() {
                         </div>
                       )}
 
-                      {royaltyProcessingEnabled && (
-                        <div className="border-b border-gray-200 pb-2">
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-[#180D43]/70 font-medium">
-                              <span>Royalty processing ({count} {terminology.plural})</span>
-                              <span>${formatNumber(royaltyProcessingFee)}/mo</span>
-                            </div>
-                            {royaltyBaseFee > 0 && (
-                              <div className="flex justify-between text-xs text-[#180D43]/50 ml-4">
-                                <span>• Base fee ({count} × ${formatNumber(royaltyBaseFee)})</span>
-                                <span>${formatNumber(royaltyBaseFee * count)}/mo</span>
-                              </div>
-                            )}
-                            {royaltyPerTransaction > 0 && estimatedTransactions > 0 && (
-                              <>
-                                <div className="flex justify-between text-xs text-[#180D43]/50 ml-4">
-                                  <span>• Transaction fees (~{estimatedTransactions} txns @ ${formatNumber(royaltyPerTransaction)})</span>
-                                  <span>${formatNumber(royaltyPerTransaction * estimatedTransactions * count)}/mo</span>
-                                </div>
-                              </>
-                            )}
-                          </div>
+                      {/* Subscription Subtotal */}
+                      <div className="pt-2 pb-2 border-b-2 border-gray-300">
+                        <div className="flex justify-between font-semibold text-sm md:text-base">
+                          <span>Subscription Subtotal:</span>
+                          <span className="text-[#1239FF]">${formatNumber(subscriptionPrice)}/mo</span>
                         </div>
+                      </div>
+
+                      {/* Optional Add-ons Section */}
+                      {royaltyProcessingEnabled && (
+                        <>
+                          <div className="pt-2 pb-1">
+                            <span className="text-xs font-semibold text-[#180D43]/60 uppercase tracking-wide">Optional Add-ons:</span>
+                          </div>
+                          <div className="border-b border-gray-200 pb-2">
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-[#180D43]/70 font-medium">
+                                <span>Royalty processing ({count} {terminology.plural})</span>
+                                <span>+${formatNumber(royaltyProcessingFee)}/mo</span>
+                              </div>
+                              {royaltyBaseFee > 0 && (
+                                <div className="flex justify-between text-xs text-[#180D43]/50 ml-4">
+                                  <span>• Base fee ({count} × ${formatNumber(royaltyBaseFee)})</span>
+                                  <span>${formatNumber(royaltyBaseFee * count)}/mo</span>
+                                </div>
+                              )}
+                              {royaltyPerTransaction > 0 && estimatedTransactions > 0 && (
+                                <>
+                                  <div className="flex justify-between text-xs text-[#180D43]/50 ml-4">
+                                    <span>• Transaction fees (~{estimatedTransactions} txns @ ${formatNumber(royaltyPerTransaction)})</span>
+                                    <span>${formatNumber(royaltyPerTransaction * estimatedTransactions * count)}/mo</span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </>
                       )}
 
                       {resellerCommission > 0 && (
@@ -1889,10 +1908,10 @@ function App() {
                         </div>
                       )}
 
-                      <div className="pt-1">
-                        <div className="flex justify-between font-medium">
+                      <div className="pt-2">
+                        <div className="flex justify-between font-bold text-base md:text-lg">
                           <span>Final Monthly Cost:</span>
-                          <span className="text-[#1239FF]">${formatNumber(finalPriceWithRoyalty)}/mo</span>
+                          <span className="text-[#1239FF]">${formatNumber(grandTotal)}/mo</span>
                         </div>
                       </div>
 
@@ -2208,8 +2227,9 @@ function App() {
             selectedPlan,
             count,
             isAnnual,
-            finalPrice: finalPriceWithRoyalty,
-            pricePerUnit,
+            finalPrice: grandTotal,
+            subscriptionPrice: subscriptionPrice,
+            subscriptionPricePerUnit: subscriptionPricePerUnit,
             totalPrice,
             monthlySavings,
             wholesaleDiscountAmount,
@@ -2235,7 +2255,7 @@ function App() {
         onClose={() => setShowClickWrapModal(false)}
         onAccept={handleModalAcceptQuote}
         quoteSummary={{
-          price: `$${finalPriceWithRoyalty.toFixed(2)}`,
+          price: `$${grandTotal.toFixed(2)}`,
           plan: currentPlan.name,
           count: count,
           isAnnual: isAnnual,
