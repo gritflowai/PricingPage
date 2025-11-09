@@ -440,6 +440,13 @@ function App() {
   // Determine if controls should be disabled (locked, accepted, or expired)
   const isLocked = quoteMode && (quoteStatus === 'locked' || quoteStatus === 'accepted' || quoteStatus === 'expired');
 
+  // Set count to 1 when Small Business Owner is selected
+  useEffect(() => {
+    if (userType === 'smb') {
+      setCount(1);
+    }
+  }, [userType]);
+
   // Auto-trigger ContactModal when count reaches enterprise threshold (skip for admins)
   useEffect(() => {
     if (count >= currentPlan.contactThreshold && !isLocked && !adminMode) {
@@ -1363,7 +1370,7 @@ function App() {
               } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div className="font-bold text-sm sm:text-base md:text-lg">AI Growth Advisor</div>
-              <div className="text-[11px] sm:text-xs md:text-sm mt-1 opacity-80">$19/user • 0 connections</div>
+              <div className="text-[11px] sm:text-xs md:text-sm mt-1 opacity-80">0 connections</div>
             </button>
             <button
               onClick={() => setSelectedPlan('starter')}
@@ -1375,7 +1382,7 @@ function App() {
               } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div className="font-bold text-sm sm:text-base md:text-lg">Starter</div>
-              <div className="text-[11px] sm:text-xs md:text-sm mt-1 opacity-80">1 connection • From $90</div>
+              <div className="text-[11px] sm:text-xs md:text-sm mt-1 opacity-80">1 connection</div>
             </button>
             <button
               onClick={() => setSelectedPlan('growth')}
@@ -1393,7 +1400,7 @@ function App() {
                 </div>
               </div>
               <div className="font-bold text-sm sm:text-base md:text-lg">Growth</div>
-              <div className="text-[11px] sm:text-xs md:text-sm mt-1 opacity-80">3 connections • From $120</div>
+              <div className="text-[11px] sm:text-xs md:text-sm mt-1 opacity-80">3 connections</div>
             </button>
             <button
               onClick={() => setSelectedPlan('scale')}
@@ -1405,7 +1412,7 @@ function App() {
               } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div className="font-bold text-sm sm:text-base md:text-lg">Scale</div>
-              <div className="text-[11px] sm:text-xs md:text-sm mt-1 opacity-80">5 connections • From $150</div>
+              <div className="text-[11px] sm:text-xs md:text-sm mt-1 opacity-80">5 connections</div>
             </button>
             <button
               onClick={() => {

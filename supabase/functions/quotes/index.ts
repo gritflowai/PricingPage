@@ -192,8 +192,9 @@ Deno.serve(async (req: Request) => {
       const updateData: any = {
           subtotal: body.summary.subtotal,
           final_monthly_price: body.summary.final_monthly_price,
-          subscription_price: body.summary.subscription_price,
-          subscription_price_per_unit: body.summary.subscription_price_per_unit,
+          // Don't include subscription_price fields - they don't exist in DB
+          // subscription_price: body.summary.subscription_price,
+          // subscription_price_per_unit: body.summary.subscription_price_per_unit,
           price_per_unit: body.summary.price_per_unit,
           annual_savings: body.summary.annual_savings,
           price_breakdown: body.summary.price_breakdown,
