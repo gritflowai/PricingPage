@@ -123,6 +123,7 @@ export interface IncomingMessage {
       content: string;
     };
     projectedLocations?: number | null;
+    showPricingDetails?: boolean;
     lockedAt?: string;
     expiresAt?: string;
   };

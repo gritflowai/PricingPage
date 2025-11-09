@@ -20,7 +20,8 @@
       "Bash(tree:*)",
       "Bash(npx supabase functions deploy:*)",
       "Bash(npx supabase link:*)",
-      "Bash(npx supabase functions:*)"
+      "Bash(npx supabase functions:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

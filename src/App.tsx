@@ -11,6 +11,8 @@ import { QuoteModeBanner } from './components/QuoteModeBanner';
 import SocialProofBadges from './components/SocialProofBadges';
 import NudgeBanner from './components/NudgeBanner';
 import FormIdErrorBanner from './components/FormIdErrorBanner';
+import { ProfitSprintOffer } from './components/ProfitSprintOffer';
+import { SalesScriptPanel } from './components/SalesScriptPanel';
 import { AlertCircle, ChevronDown, Shield, CreditCard, RefreshCw, Copy, BarChart3, TrendingUp, DollarSign, FileText } from 'lucide-react';
 import { useIframeMessaging } from './hooks/useIframeMessaging';
 import { calculateCustomDiscount, type DiscountType } from './utils/discountCalculator';
@@ -125,6 +127,7 @@ function getEmbedConfig() {
     mode: params.get('mode') || 'calculator',
     formId: params.get('formId') || null,
     expiresInDays: parseInt(params.get('quoteExpiresInDays') || '14', 10),
+    showPricingDetails: params.get('showPricingDetails') === 'true',
     // User type parameter
     initialUserType,
   };
@@ -151,6 +154,21 @@ function loadSavedSettings(): {
   customTermsEnabled: boolean;
   customTermsTitle: string;
   customTermsContent: string;
+  // Training offer settings
+  trainingOfferEnabled: boolean;
+  trainingOfferBasePrice: number;
+  trainingOfferSinglePayment: boolean;
+  trainingOfferTwoPayment: boolean;
+  trainingOfferThreePayment: boolean;
+  trainingOfferSpotsAvailable: number;
+  trainingOfferHeadlinePrimary: string;
+  trainingOfferHeadlineSecondary: string;
+  trainingOfferGuaranteeEnabled: boolean;
+  trainingOfferGuaranteeText: string;
+  trainingOfferTestimonialName: string;
+  trainingOfferTestimonialRole: string;
+  trainingOfferTestimonialQuote: string;
+  trainingOfferUrgencyText: string;
 } {
   try {
     const saved = localStorage.getItem('pricingSettings');
@@ -189,7 +207,22 @@ function loadSavedSettings(): {
         quoteExpirationDays: parsed.quoteExpirationDays ?? 14,
         customTermsEnabled: parsed.customTermsEnabled ?? false,
         customTermsTitle: parsed.customTermsTitle || 'Custom Terms & Conditions',
-        customTermsContent: parsed.customTermsContent || ''
+        customTermsContent: parsed.customTermsContent || '',
+        // Training offer settings
+        trainingOfferEnabled: parsed.trainingOfferEnabled ?? false,
+        trainingOfferBasePrice: parsed.trainingOfferBasePrice ?? 3800,
+        trainingOfferSinglePayment: parsed.trainingOfferSinglePayment ?? true,
+        trainingOfferTwoPayment: parsed.trainingOfferTwoPayment ?? false,
+        trainingOfferThreePayment: parsed.trainingOfferThreePayment ?? false,
+        trainingOfferSpotsAvailable: parsed.trainingOfferSpotsAvailable ?? 3,
+        trainingOfferHeadlinePrimary: parsed.trainingOfferHeadlinePrimary || 'The $118,121 Problem Hiding in Your P&L',
+        trainingOfferHeadlineSecondary: parsed.trainingOfferHeadlineSecondary || 'Transform Your Financial Literacy Into 30-50% Higher Profit Margins',
+        trainingOfferGuaranteeEnabled: parsed.trainingOfferGuaranteeEnabled ?? true,
+        trainingOfferGuaranteeText: parsed.trainingOfferGuaranteeText || "14-Day Money-Back Guarantee: If you're not satisfied with the training within the first 14 days, you get a full refund",
+        trainingOfferTestimonialName: parsed.trainingOfferTestimonialName || 'Jane Smith',
+        trainingOfferTestimonialRole: parsed.trainingOfferTestimonialRole || 'CEO, F45 Fitness Franchise',
+        trainingOfferTestimonialQuote: parsed.trainingOfferTestimonialQuote || 'Found $15,000 in hidden profit in my very first P&L review session. The AI insights were eye-opening.',
+        trainingOfferUrgencyText: parsed.trainingOfferUrgencyText || 'Limited spots available - Only 3 clients accepted this month'
       };
     }
   } catch (error) {
@@ -214,7 +247,22 @@ function loadSavedSettings(): {
     quoteExpirationDays: 14,
     customTermsEnabled: false,
     customTermsTitle: 'Custom Terms & Conditions',
-    customTermsContent: ''
+    customTermsContent: '',
+    // Training offer defaults
+    trainingOfferEnabled: false,
+    trainingOfferBasePrice: 3800,
+    trainingOfferSinglePayment: true,
+    trainingOfferTwoPayment: true,
+    trainingOfferThreePayment: true,
+    trainingOfferSpotsAvailable: 3,
+    trainingOfferHeadlinePrimary: 'The $118,121 Problem Hiding in Your P&L',
+    trainingOfferHeadlineSecondary: 'Transform Your Financial Literacy Into 30-50% Higher Profit Margins',
+    trainingOfferGuaranteeEnabled: true,
+    trainingOfferGuaranteeText: "14-Day Money-Back Guarantee: If you're not satisfied with the training within the first 14 days, you get a full refund",
+    trainingOfferTestimonialName: 'Jane Smith',
+    trainingOfferTestimonialRole: 'CEO, F45 Fitness Franchise',
+    trainingOfferTestimonialQuote: 'Found $15,000 in hidden profit in my very first P&L review session. The AI insights were eye-opening.',
+    trainingOfferUrgencyText: 'Limited spots available - Only 3 clients accepted this month'
   };
 }
 
@@ -264,7 +312,7 @@ function App() {
   );
   const [customDiscountReason, setCustomDiscountReason] = useState(savedSettings.customDiscountReason);
   const [showContactModal, setShowContactModal] = useState(false);
-  const [showPricingDetails, setShowPricingDetails] = useState(false);
+  const [showPricingDetails, setShowPricingDetails] = useState(embedConfig.showPricingDetails || false);
   const [showPlanDetails, setShowPlanDetails] = useState(false);
   const [isEnterpriseRequest, setIsEnterpriseRequest] = useState(false);
   const [showNudgeBanner, setShowNudgeBanner] = useState(false);
@@ -306,6 +354,59 @@ function App() {
     savedSettings.customTermsContent ?? ''
   );
 
+  // Training Offer state
+  const [trainingOfferEnabled, setTrainingOfferEnabled] = useState(
+    savedSettings.trainingOfferEnabled ?? false
+  );
+  const [trainingOfferBasePrice, setTrainingOfferBasePrice] = useState(
+    savedSettings.trainingOfferBasePrice ?? 3800
+  );
+  const [trainingOfferSinglePayment, setTrainingOfferSinglePayment] = useState(
+    savedSettings.trainingOfferSinglePayment ?? true
+  );
+  const [trainingOfferTwoPayment, setTrainingOfferTwoPayment] = useState(
+    savedSettings.trainingOfferTwoPayment ?? false
+  );
+  const [trainingOfferThreePayment, setTrainingOfferThreePayment] = useState(
+    savedSettings.trainingOfferThreePayment ?? false
+  );
+  const [trainingOfferSpotsAvailable, setTrainingOfferSpotsAvailable] = useState(
+    savedSettings.trainingOfferSpotsAvailable ?? 3
+  );
+  const [trainingOfferHeadlinePrimary, setTrainingOfferHeadlinePrimary] = useState(
+    savedSettings.trainingOfferHeadlinePrimary ?? 'The $118,121 Problem Hiding in Your P&L'
+  );
+  const [trainingOfferHeadlineSecondary, setTrainingOfferHeadlineSecondary] = useState(
+    savedSettings.trainingOfferHeadlineSecondary ?? 'Transform Your Financial Literacy Into 30-50% Higher Profit Margins'
+  );
+  const [trainingOfferGuaranteeEnabled, setTrainingOfferGuaranteeEnabled] = useState(
+    savedSettings.trainingOfferGuaranteeEnabled ?? true
+  );
+  const [trainingOfferGuaranteeText, setTrainingOfferGuaranteeText] = useState(
+    savedSettings.trainingOfferGuaranteeText ?? "14-Day Money-Back Guarantee: If you're not satisfied with the training within the first 14 days, you get a full refund"
+  );
+  const [trainingOfferTestimonialName, setTrainingOfferTestimonialName] = useState(
+    savedSettings.trainingOfferTestimonialName ?? 'Jane Smith'
+  );
+  const [trainingOfferTestimonialRole, setTrainingOfferTestimonialRole] = useState(
+    savedSettings.trainingOfferTestimonialRole ?? 'CEO, F45 Fitness Franchise'
+  );
+  const [trainingOfferTestimonialQuote, setTrainingOfferTestimonialQuote] = useState(
+    savedSettings.trainingOfferTestimonialQuote ?? 'Found $15,000 in hidden profit in my very first P&L review session. The AI insights were eye-opening.'
+  );
+  const [trainingOfferUrgencyText, setTrainingOfferUrgencyText] = useState(
+    savedSettings.trainingOfferUrgencyText ?? 'Limited spots available - Only 3 clients accepted this month'
+  );
+
+  // Computed training offer variables for compatibility
+  const paymentOptionsArray = [];
+  if (trainingOfferSinglePayment) paymentOptionsArray.push('1');
+  if (trainingOfferTwoPayment) paymentOptionsArray.push('2');
+  if (trainingOfferThreePayment) paymentOptionsArray.push('3');
+  const trainingOfferPaymentOptions = paymentOptionsArray.join(',') || '1,2,3';
+  const trainingOfferHeadline = trainingOfferHeadlinePrimary;
+  const trainingOfferSubheadline = trainingOfferHeadlineSecondary;
+
   // Quote mode state
   const [quoteMode, setQuoteMode] = useState(embedConfig.mode === 'quote');
   const [showClickWrapModal, setShowClickWrapModal] = useState(false);
@@ -316,6 +417,7 @@ function App() {
   const [quoteAcceptedAt, setQuoteAcceptedAt] = useState<string | null>(null);
   const [currentPricingModelId, setCurrentPricingModelId] = useState<string | null>(null);
   const [waitingForInit, setWaitingForInit] = useState(false);
+  const [quoteLoadComplete, setQuoteLoadComplete] = useState(false); // Track if initial quote load is done
 
   // Admin mode state (for salespeople)
   const [adminMode, setAdminMode] = useState(embedConfig.adminMode);
@@ -477,9 +579,20 @@ function App() {
     setNudgeBannerDismissed(false);
   }, [selectedPlan]);
 
+  // Sync royalty addon visibility with enabled state
+  useEffect(() => {
+    if (royaltyProcessingEnabled) {
+      setShowRoyaltyAddon(true);
+    }
+  }, [royaltyProcessingEnabled]);
+
   // Quote mode initialization - Two-phase approach
   useEffect(() => {
-    if (!quoteMode) return;
+    if (!quoteMode) {
+      // Not in quote mode - no quote to load
+      setQuoteLoadComplete(true);
+      return;
+    }
 
     const initializeQuote = async () => {
       try {
@@ -577,6 +690,38 @@ function App() {
                 setCustomTermsTitle('Custom Terms & Conditions');
                 setCustomTermsContent('');
               }
+
+              // Restore Training Offer settings
+              if (raw.trainingOffer) {
+                const offer = raw.trainingOffer;
+                setTrainingOfferEnabled(offer.enabled || false);
+                setTrainingOfferBasePrice(offer.basePrice || 3800);
+                setTrainingOfferSinglePayment(offer.singlePayment || false);
+                setTrainingOfferTwoPayment(offer.twoPayment || false);
+                setTrainingOfferThreePayment(offer.threePayment || false);
+                setTrainingOfferSpotsAvailable(offer.spotsAvailable || 3);
+                setTrainingOfferHeadlinePrimary(offer.headline || 'The $118,121 Problem Hiding in Your P&L');
+                setTrainingOfferHeadlineSecondary(offer.subheadline || 'Transform Your Financial Literacy Into 30-50% Higher Profit Margins');
+                setTrainingOfferGuaranteeEnabled(offer.guaranteeEnabled !== undefined ? offer.guaranteeEnabled : true);
+                setTrainingOfferGuaranteeText(offer.guaranteeText || "14-Day Money-Back Guarantee: If you're not satisfied with the training within the first 14 days, you get a full refund");
+              } else {
+                // Clear training offer if not in quote
+                setTrainingOfferEnabled(false);
+                setTrainingOfferBasePrice(3800);
+                setTrainingOfferSinglePayment(false);
+                setTrainingOfferTwoPayment(false);
+                setTrainingOfferThreePayment(false);
+                setTrainingOfferSpotsAvailable(3);
+                setTrainingOfferHeadlinePrimary('The $118,121 Problem Hiding in Your P&L');
+                setTrainingOfferHeadlineSecondary('Transform Your Financial Literacy Into 30-50% Higher Profit Margins');
+                setTrainingOfferGuaranteeEnabled(true);
+                setTrainingOfferGuaranteeText("14-Day Money-Back Guarantee: If you're not satisfied with the training within the first 14 days, you get a full refund");
+              }
+
+              // Restore showPricingDetails state
+              if (raw.showPricingDetails !== undefined) {
+                setShowPricingDetails(raw.showPricingDetails);
+              }
             }
 
             // Send QUOTE_ID_READY to parent after successful load
@@ -586,12 +731,16 @@ function App() {
               version: existingQuote.version || 1,
             });
 
+            // Mark quote load as complete to enable auto-save
+            setQuoteLoadComplete(true);
             console.log('[PricingCalculator] Quote loaded successfully, sent QUOTE_ID_READY');
           } catch (error: any) {
             // Phase 2: Quote doesn't exist - wait for INIT_QUOTE message
             if (error?.message?.includes('Quote not found') || error?.message?.includes('404')) {
               console.log('[PricingCalculator] Quote not found, waiting for INIT_QUOTE message from parent...');
               setWaitingForInit(true);
+              // Mark as complete since we're waiting for INIT_QUOTE (new quote scenario)
+              setQuoteLoadComplete(true);
               // Don't send error - this is expected for new quotes
             } else {
               // Real error (network, etc.) - report it
@@ -607,6 +756,8 @@ function App() {
             'Quote mode requires a formId parameter in the URL',
             'VALIDATION_ERROR'
           );
+          // Mark as complete even though there's an error (prevents auto-save loop)
+          setQuoteLoadComplete(true);
           return;
         }
       } catch (error) {
@@ -616,6 +767,8 @@ function App() {
           'UNKNOWN',
           { error }
         );
+        // Mark as complete even on error to prevent auto-save loop
+        setQuoteLoadComplete(true);
       }
     };
 
@@ -719,10 +872,12 @@ function App() {
       quoteStatus,
       formId,
       count,
-      shouldSave: quoteMode && quoteStatus === 'draft' && formId
+      quoteLoadComplete,
+      shouldSave: quoteMode && quoteStatus === 'draft' && formId && quoteLoadComplete
     });
 
-    if (!quoteMode || quoteStatus !== 'draft' || !formId) return;
+    // Don't auto-save until initial quote load is complete
+    if (!quoteMode || quoteStatus !== 'draft' || !formId || !quoteLoadComplete) return;
 
     const timer = setTimeout(async () => {
       console.log('[Auto-Save] Attempting to save quote with count:', count);
@@ -741,6 +896,7 @@ function App() {
             annualSavings: monthlySavings,
             subscriptionPrice: subscriptionPrice,
             royaltyProcessingFee: royaltyProcessingFee,
+            trainingOfferPrice: trainingOfferEnabled ? trainingOfferBasePrice : 0,
             finalMonthlyPrice: grandTotal,
           },
           plan_details: {
@@ -757,6 +913,7 @@ function App() {
             selectedPlan,
             count,
             isAnnual,
+            showPricingDetails,
             projectedLocations: projectedLocations || null,
             customDiscount: customDiscountAmount > 0 && customDiscountType ? {
               type: customDiscountType,
@@ -781,6 +938,18 @@ function App() {
               enabled: true,
               title: customTermsTitle,
               content: customTermsContent,
+            } : null,
+            trainingOffer: trainingOfferEnabled ? {
+              enabled: true,
+              basePrice: trainingOfferBasePrice,
+              singlePayment: trainingOfferSinglePayment,
+              twoPayment: trainingOfferTwoPayment,
+              threePayment: trainingOfferThreePayment,
+              spotsAvailable: trainingOfferSpotsAvailable,
+              headline: trainingOfferHeadlinePrimary,
+              subheadline: trainingOfferHeadlineSecondary,
+              guaranteeEnabled: trainingOfferGuaranteeEnabled,
+              guaranteeText: trainingOfferGuaranteeText,
             } : null,
           },
         };
@@ -848,9 +1017,21 @@ function App() {
     customTermsEnabled,
     customTermsTitle,
     customTermsContent,
+    showPricingDetails,
     currentPricingModelId,
     isInIframe,
     embedConfig,
+    quoteLoadComplete,
+    trainingOfferEnabled,
+    trainingOfferBasePrice,
+    trainingOfferSinglePayment,
+    trainingOfferTwoPayment,
+    trainingOfferThreePayment,
+    trainingOfferSpotsAvailable,
+    trainingOfferHeadlinePrimary,
+    trainingOfferHeadlineSecondary,
+    trainingOfferGuaranteeEnabled,
+    trainingOfferGuaranteeText,
   ]);
 
   const formatNumber = (num: number) => {
@@ -940,7 +1121,17 @@ function App() {
     newQuoteExpirationDays: number,
     newCustomTermsEnabled: boolean,
     newCustomTermsTitle: string,
-    newCustomTermsContent: string
+    newCustomTermsContent: string,
+    newTrainingOfferEnabled: boolean,
+    newTrainingOfferBasePrice: number,
+    newTrainingOfferSinglePayment: boolean,
+    newTrainingOfferTwoPayment: boolean,
+    newTrainingOfferThreePayment: boolean,
+    newTrainingOfferSpotsAvailable: number,
+    newTrainingOfferHeadlinePrimary: string,
+    newTrainingOfferHeadlineSecondary: string,
+    newTrainingOfferGuaranteeEnabled: boolean,
+    newTrainingOfferGuaranteeText: string
   ) => {
     setPlanConfigs(updatedConfigs);
     setWholesaleDiscount(newWholesaleDiscount);
@@ -961,6 +1152,16 @@ function App() {
     setCustomTermsEnabled(newCustomTermsEnabled);
     setCustomTermsTitle(newCustomTermsTitle);
     setCustomTermsContent(newCustomTermsContent);
+    setTrainingOfferEnabled(newTrainingOfferEnabled);
+    setTrainingOfferBasePrice(newTrainingOfferBasePrice);
+    setTrainingOfferSinglePayment(newTrainingOfferSinglePayment);
+    setTrainingOfferTwoPayment(newTrainingOfferTwoPayment);
+    setTrainingOfferThreePayment(newTrainingOfferThreePayment);
+    setTrainingOfferSpotsAvailable(newTrainingOfferSpotsAvailable);
+    setTrainingOfferHeadlinePrimary(newTrainingOfferHeadlinePrimary);
+    setTrainingOfferHeadlineSecondary(newTrainingOfferHeadlineSecondary);
+    setTrainingOfferGuaranteeEnabled(newTrainingOfferGuaranteeEnabled);
+    setTrainingOfferGuaranteeText(newTrainingOfferGuaranteeText);
 
     // Save to localStorage
     try {
@@ -983,7 +1184,21 @@ function App() {
         quoteExpirationDays: newQuoteExpirationDays,
         customTermsEnabled: newCustomTermsEnabled,
         customTermsTitle: newCustomTermsTitle,
-        customTermsContent: newCustomTermsContent
+        customTermsContent: newCustomTermsContent,
+        trainingOfferEnabled: newTrainingOfferEnabled,
+        trainingOfferBasePrice: newTrainingOfferBasePrice,
+        trainingOfferSinglePayment: paymentOpts.includes('1'),
+        trainingOfferTwoPayment: paymentOpts.includes('2'),
+        trainingOfferThreePayment: paymentOpts.includes('3'),
+        trainingOfferHeadlinePrimary: newTrainingOfferHeadline,
+        trainingOfferHeadlineSecondary: newTrainingOfferSubheadline,
+        trainingOfferTestimonialName: newTrainingOfferTestimonialName,
+        trainingOfferTestimonialRole: newTrainingOfferTestimonialRole,
+        trainingOfferTestimonialQuote: newTrainingOfferTestimonialQuote,
+        trainingOfferSpotsAvailable: newTrainingOfferSpotsAvailable,
+        trainingOfferUrgencyText: newTrainingOfferUrgencyText,
+        trainingOfferGuaranteeEnabled: true,
+        trainingOfferGuaranteeText: savedSettings.trainingOfferGuaranteeText ?? "If you don't identify meaningful profit improvements within 30 days, we'll continue working with you at no additional charge until you do."
       }));
     } catch (error) {
       console.error('Failed to save settings:', error);
@@ -1236,6 +1451,11 @@ function App() {
           setProjectedLocations(data.projectedLocations);
         }
 
+        // Apply showPricingDetails if provided
+        if (data?.showPricingDetails !== undefined) {
+          setShowPricingDetails(data.showPricingDetails);
+        }
+
         // Apply locked/expires dates if provided
         if (data?.lockedAt) {
           setQuoteLockedAt(data.lockedAt);
@@ -1251,6 +1471,8 @@ function App() {
           version: 1,
         });
 
+        // Mark quote load as complete after INIT_QUOTE
+        setQuoteLoadComplete(true);
         console.log('[PricingCalculator] Quote initialized successfully, sent QUOTE_ID_READY');
       } catch (error) {
         console.error('[PricingCalculator] Failed to initialize quote from INIT_QUOTE:', error);
@@ -1260,6 +1482,8 @@ function App() {
           { formId, error }
         );
         setWaitingForInit(false);
+        // Mark as complete even on error
+        setQuoteLoadComplete(true);
       }
     };
 
@@ -1347,15 +1571,39 @@ function App() {
         <div className={`max-w-6xl mx-auto ${bottomMargin} ${topMargin}`}>
         {/* Quote Mode Banner */}
         {quoteMode && (
-          <QuoteModeBanner
-            status={quoteStatus}
-            expiresAt={quoteExpiresAt}
-            lockedAt={quoteLockedAt}
-            onScheduleMeeting={() => {
-              setIsEnterpriseRequest(true);
-              setShowContactModal(true);
-            }}
-          />
+          <>
+            <QuoteModeBanner
+              status={quoteStatus}
+              expiresAt={quoteExpiresAt}
+              lockedAt={quoteLockedAt}
+              onScheduleMeeting={() => {
+                setIsEnterpriseRequest(true);
+                setShowContactModal(true);
+              }}
+            />
+            {/* Minimalistic copy quote button - tiny period style */}
+            {formId && (
+              <button
+                onClick={handleCopyShareLink}
+                className="fixed top-5 right-5 z-50 w-3 h-3 bg-gray-500 hover:bg-blue-600 rounded-full transition-all hover:w-8 hover:h-8 group flex items-center justify-center"
+                title="Copy quote link"
+              >
+                <svg
+                  className="w-0 h-0 group-hover:w-4 group-hover:h-4 text-white transition-all"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                  />
+                </svg>
+              </button>
+            )}
+          </>
         )}
 
         <div className="bg-white rounded-lg shadow-sm border border-[#1239FF]/10 p-1 overflow-visible relative">
@@ -1790,8 +2038,8 @@ function App() {
                 )}
               </div>
 
-              {/* Royalty Processing Add-on */}
-              {selectedPlan !== 'ai-advisor' && (
+              {/* Royalty Processing Add-on - Only for franchisees */}
+              {selectedPlan !== 'ai-advisor' && userType === 'franchisee' && (
                 <div className="border-t border-gray-200 pt-3 mt-3">
                   {!showRoyaltyAddon && !royaltyProcessingEnabled && (
                     <button
@@ -2003,6 +2251,49 @@ function App() {
                                 {onboardingFeeDescription}
                               </p>
                             )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Training Offer Section */}
+                      {trainingOfferEnabled && (
+                        <div className="border-t border-gray-200 pt-2 mt-2">
+                          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-300 rounded-lg p-3">
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-[#180D43]">90 Day Profit Playbook Accelerator Program</span>
+                                  <Tooltip content="Transform your P&L into 30-50% higher profit margins with our proven system combining AI analysis, 2,500 strategies from 250 books, and weekly accountability" position="top" />
+                                </div>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="inline-block bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                                    ONE-TIME TRAINING FEE
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="font-bold text-lg text-blue-700">
+                                ${formatNumber(trainingOfferBasePrice)}
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-600 mt-2">
+                              <div className="flex items-center gap-1">
+                                <span className="text-gray-500">•</span>
+                                <span>
+                                  {/* Display the selected payment option */}
+                                  {trainingOfferThreePayment ?
+                                    `3 Monthly Payments: $${formatNumber(Math.round(trainingOfferBasePrice / 3))} × 3` :
+                                    trainingOfferTwoPayment ?
+                                    `2 Payments: $${formatNumber(Math.round(trainingOfferBasePrice / 2))} × 2` :
+                                    `Pay in Full: $${formatNumber(trainingOfferBasePrice)}`
+                                  }
+                                </span>
+                              </div>
+                              {trainingOfferGuaranteeEnabled && (
+                                <p className="mt-2 text-xs italic text-green-700 bg-green-50 p-2 rounded border border-green-200">
+                                  ✓ 14-Day Money-Back Guarantee: If you're not satisfied with the training within the first 14 days, you get a full refund
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </div>
                       )}
@@ -2234,7 +2525,63 @@ function App() {
       </div>
 
       {/* Feature Comparison Table */}
-      <FeatureComparison selectedPlan={selectedPlan} />
+      <FeatureComparison
+        selectedPlan={selectedPlan}
+        userType={userType}
+        trainingOfferEnabled={trainingOfferEnabled}
+        trainingOfferConfig={{
+          basePrice: trainingOfferBasePrice,
+          paymentPlans: {
+            single: trainingOfferSinglePayment,
+            twoPayment: trainingOfferTwoPayment,
+            threePayment: trainingOfferThreePayment
+          }
+        }}
+      />
+
+      {/* Profit Sprint Offer - Show on public pricing page when enabled */}
+      {!adminMode && trainingOfferEnabled && (
+        <ProfitSprintOffer
+          isVisible={true}
+          onCTAClick={() => setShowContactModal(true)}
+          config={{
+            enabled: trainingOfferEnabled,
+            basePrice: trainingOfferBasePrice,
+            paymentPlans: {
+              single: trainingOfferSinglePayment,
+              twoPayment: trainingOfferTwoPayment,
+              threePayment: trainingOfferThreePayment
+            },
+            spotsAvailable: trainingOfferSpotsAvailable,
+            headlines: {
+              primary: trainingOfferHeadlinePrimary,
+              subhead: trainingOfferHeadlineSecondary
+            },
+            showCitations: true,
+            guaranteeEnabled: trainingOfferGuaranteeEnabled,
+            guaranteeText: trainingOfferGuaranteeText
+          }}
+        />
+      )}
+
+      {/* Sales Script Panel - Show only in admin mode when training offer is enabled */}
+      {adminMode && trainingOfferEnabled && (
+        <SalesScriptPanel
+          isVisible={true}
+          config={{
+            enabled: trainingOfferEnabled,
+            basePrice: trainingOfferBasePrice,
+            paymentOptions: trainingOfferPaymentOptions,
+            headline: trainingOfferHeadline,
+            subheadline: trainingOfferSubheadline,
+            testimonialName: trainingOfferTestimonialName,
+            testimonialRole: trainingOfferTestimonialRole,
+            testimonialQuote: trainingOfferTestimonialQuote,
+            spotsAvailable: trainingOfferSpotsAvailable,
+            urgencyText: trainingOfferUrgencyText
+          }}
+        />
+      )}
 
       {adminMode && (
         <Settings
@@ -2257,6 +2604,16 @@ function App() {
           customTermsEnabled={customTermsEnabled}
           customTermsTitle={customTermsTitle}
           customTermsContent={customTermsContent}
+          trainingOfferEnabled={trainingOfferEnabled}
+          trainingOfferBasePrice={trainingOfferBasePrice}
+          trainingOfferSinglePayment={trainingOfferSinglePayment}
+          trainingOfferTwoPayment={trainingOfferTwoPayment}
+          trainingOfferThreePayment={trainingOfferThreePayment}
+          trainingOfferSpotsAvailable={trainingOfferSpotsAvailable}
+          trainingOfferHeadlinePrimary={trainingOfferHeadlinePrimary}
+          trainingOfferHeadlineSecondary={trainingOfferHeadlineSecondary}
+          trainingOfferGuaranteeEnabled={trainingOfferGuaranteeEnabled}
+          trainingOfferGuaranteeText={trainingOfferGuaranteeText}
           onUpdatePricing={handlePricingUpdate}
           isEmbedded={embedConfig.isEmbedded}
           terminology={terminology}
@@ -2267,6 +2624,7 @@ function App() {
           quoteLockedAt={quoteLockedAt}
           quoteAcceptedAt={quoteAcceptedAt}
           onUnlockQuote={handleUnlockQuote}
+          onClose={undefined}
         />
       )}
 

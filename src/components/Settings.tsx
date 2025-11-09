@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings2, X, Plus, AlertCircle, RotateCcw, Unlock, FileText } from 'lucide-react';
 import { type DiscountType } from '../utils/discountCalculator';
 import { type PlanType, type PlanConfig, type PricingTier } from '../config/planConfigs';
 import type { QuoteStatus } from '../types/quote';
 
-type TabType = PlanType | 'reseller' | 'discounts' | 'royalty-processing' | 'onboarding-fee' | 'custom-terms';
+type TabType = PlanType | 'reseller' | 'discounts' | 'royalty-processing' | 'onboarding-fee' | 'custom-terms' | 'training-offer';
 
 interface SettingsProps {
   planConfigs: Record<PlanType, PlanConfig>;
@@ -26,6 +26,17 @@ interface SettingsProps {
   customTermsEnabled: boolean;
   customTermsTitle: string;
   customTermsContent: string;
+  // Training offer props
+  trainingOfferEnabled: boolean;
+  trainingOfferBasePrice: number;
+  trainingOfferSinglePayment: boolean;
+  trainingOfferTwoPayment: boolean;
+  trainingOfferThreePayment: boolean;
+  trainingOfferSpotsAvailable: number;
+  trainingOfferHeadlinePrimary: string;
+  trainingOfferHeadlineSecondary: string;
+  trainingOfferGuaranteeEnabled: boolean;
+  trainingOfferGuaranteeText: string;
   onUpdatePricing: (
     configs: Record<PlanType, PlanConfig>,
     wholesaleDiscount: number,
@@ -45,7 +56,17 @@ interface SettingsProps {
     quoteExpirationDays: number,
     customTermsEnabled: boolean,
     customTermsTitle: string,
-    customTermsContent: string
+    customTermsContent: string,
+    trainingOfferEnabled: boolean,
+    trainingOfferBasePrice: number,
+    trainingOfferSinglePayment: boolean,
+    trainingOfferTwoPayment: boolean,
+    trainingOfferThreePayment: boolean,
+    trainingOfferSpotsAvailable: number,
+    trainingOfferHeadlinePrimary: string,
+    trainingOfferHeadlineSecondary: string,
+    trainingOfferGuaranteeEnabled: boolean,
+    trainingOfferGuaranteeText: string
   ) => void;
   isEmbedded?: boolean;
   terminology?: {
@@ -61,6 +82,7 @@ interface SettingsProps {
   quoteLockedAt?: string | null;
   quoteAcceptedAt?: string | null;
   onUnlockQuote?: () => Promise<void>;
+  onClose?: () => void;
 }
 
 const Settings: React.FC<SettingsProps> = ({
@@ -83,6 +105,16 @@ const Settings: React.FC<SettingsProps> = ({
   customTermsEnabled: initialCustomTermsEnabled,
   customTermsTitle: initialCustomTermsTitle,
   customTermsContent: initialCustomTermsContent,
+  trainingOfferEnabled: initialTrainingOfferEnabled,
+  trainingOfferBasePrice: initialTrainingOfferBasePrice,
+  trainingOfferSinglePayment: initialTrainingOfferSinglePayment,
+  trainingOfferTwoPayment: initialTrainingOfferTwoPayment,
+  trainingOfferThreePayment: initialTrainingOfferThreePayment,
+  trainingOfferSpotsAvailable: initialTrainingOfferSpotsAvailable,
+  trainingOfferHeadlinePrimary: initialTrainingOfferHeadlinePrimary,
+  trainingOfferHeadlineSecondary: initialTrainingOfferHeadlineSecondary,
+  trainingOfferGuaranteeEnabled: initialTrainingOfferGuaranteeEnabled,
+  trainingOfferGuaranteeText: initialTrainingOfferGuaranteeText,
   onUpdatePricing,
   isEmbedded = false,
   terminology = { singular: 'company', plural: 'companies', capitalized: 'Companies' },
@@ -92,7 +124,8 @@ const Settings: React.FC<SettingsProps> = ({
   quoteStatus = 'draft',
   quoteLockedAt = null,
   quoteAcceptedAt = null,
-  onUnlockQuote
+  onUnlockQuote,
+  onClose
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('ai-advisor');
@@ -114,6 +147,46 @@ const Settings: React.FC<SettingsProps> = ({
   const [customTermsEnabled, setCustomTermsEnabled] = useState(initialCustomTermsEnabled);
   const [customTermsTitle, setCustomTermsTitle] = useState(initialCustomTermsTitle);
   const [customTermsContent, setCustomTermsContent] = useState(initialCustomTermsContent);
+
+  // Sync royalty processing state when props change
+  useEffect(() => {
+    setRoyaltyProcessingEnabled(initialRoyaltyProcessingEnabled);
+  }, [initialRoyaltyProcessingEnabled]);
+
+  // Sync estimated transactions when props change
+  useEffect(() => {
+    setEstimatedTransactions(initialEstimatedTransactions);
+  }, [initialEstimatedTransactions]);
+
+  // Sync royalty base fee when props change
+  useEffect(() => {
+    setRoyaltyBaseFee(initialRoyaltyBaseFee);
+  }, [initialRoyaltyBaseFee]);
+
+  // Sync royalty per transaction fees when props change
+  useEffect(() => {
+    // If total is 1.82 (default), use 0.32, otherwise try to preserve ratio
+    setWorldPayFee(initialRoyaltyPerTransaction === 1.82 ? 0.32 : 0.32);
+    // If total is 1.82 (default), use 1.50, otherwise calculate from remainder
+    setAchServiceFee(initialRoyaltyPerTransaction === 1.82 ? 1.50 : Math.max(0, initialRoyaltyPerTransaction - 0.32));
+  }, [initialRoyaltyPerTransaction]);
+
+  // Training Offer state
+  const [trainingOfferEnabled, setTrainingOfferEnabled] = useState(initialTrainingOfferEnabled);
+  const [trainingOfferBasePrice, setTrainingOfferBasePrice] = useState(initialTrainingOfferBasePrice);
+  // Convert legacy boolean payment options to single selected payment plan
+  const getInitialPaymentPlan = () => {
+    if (initialTrainingOfferSinglePayment) return '1';
+    if (initialTrainingOfferTwoPayment) return '2';
+    if (initialTrainingOfferThreePayment) return '3';
+    return '1'; // Default to single payment
+  };
+  const [trainingOfferPaymentPlan, setTrainingOfferPaymentPlan] = useState<'1' | '2' | '3'>(getInitialPaymentPlan());
+  const [trainingOfferSpotsAvailable, setTrainingOfferSpotsAvailable] = useState(initialTrainingOfferSpotsAvailable);
+  const [trainingOfferHeadlinePrimary, setTrainingOfferHeadlinePrimary] = useState(initialTrainingOfferHeadlinePrimary);
+  const [trainingOfferHeadlineSecondary, setTrainingOfferHeadlineSecondary] = useState(initialTrainingOfferHeadlineSecondary);
+  const [trainingOfferGuaranteeEnabled, setTrainingOfferGuaranteeEnabled] = useState(initialTrainingOfferGuaranteeEnabled);
+  const [trainingOfferGuaranteeText, setTrainingOfferGuaranteeText] = useState(initialTrainingOfferGuaranteeText);
 
   // Split out WorldPay fee and service fee (initialize from total if already set)
   const [worldPayFee, setWorldPayFee] = useState(() => {
@@ -159,9 +232,26 @@ const Settings: React.FC<SettingsProps> = ({
       quoteExpirationDays,
       customTermsEnabled,
       customTermsTitle,
-      customTermsContent
+      customTermsContent,
+      trainingOfferEnabled,
+      trainingOfferBasePrice,
+      trainingOfferPaymentPlan === '1', // trainingOfferSinglePayment
+      trainingOfferPaymentPlan === '2', // trainingOfferTwoPayment
+      trainingOfferPaymentPlan === '3', // trainingOfferThreePayment
+      trainingOfferSpotsAvailable,
+      trainingOfferHeadlinePrimary,
+      trainingOfferHeadlineSecondary,
+      trainingOfferGuaranteeEnabled,
+      trainingOfferGuaranteeText
     );
-    setIsOpen(false);
+
+    // If onClose callback is provided, call it to hide the entire Settings component
+    // Otherwise, just close the modal dialog
+    if (onClose) {
+      onClose();
+    } else {
+      setIsOpen(false);
+    }
   };
 
   const handleReset = () => {
@@ -195,6 +285,19 @@ const Settings: React.FC<SettingsProps> = ({
       setOnboardingFeeDescription('Setup sCOA, hierarchy, benchmarking, KPI reporting and forecasting, and setup custom scorecards. This is white-glove onboarding with dedicated support to ensure your success from day one.');
       setQuoteStartDate(new Date().toISOString().split('T')[0]);
       setQuoteExpirationDays(14);
+      setCustomTermsEnabled(false);
+      setCustomTermsTitle('');
+      setCustomTermsContent('');
+
+      // Reset Training Offer settings
+      setTrainingOfferEnabled(false);
+      setTrainingOfferBasePrice(3800);
+      setTrainingOfferPaymentPlan('1'); // Default to single payment
+      setTrainingOfferSpotsAvailable(3);
+      setTrainingOfferHeadlinePrimary('The $118,121 Problem Hiding in Your P&L');
+      setTrainingOfferHeadlineSecondary('Transform Your Financial Literacy Into 30-50% Higher Profit Margins');
+      setTrainingOfferGuaranteeEnabled(true);
+      setTrainingOfferGuaranteeText("14-Day Money-Back Guarantee: If you're not satisfied with the training within the first 14 days, you get a full refund");
 
       // Optionally, you can also save the defaults immediately
       onUpdatePricing(
@@ -213,7 +316,20 @@ const Settings: React.FC<SettingsProps> = ({
         'Custom Onboarding Fee',
         'Setup sCOA, hierarchy, benchmarking, KPI reporting and forecasting, and setup custom scorecards. This is white-glove onboarding with dedicated support to ensure your success from day one.',
         new Date().toISOString().split('T')[0],
-        14
+        14,
+        false, // customTermsEnabled
+        '', // customTermsTitle
+        '', // customTermsContent
+        false, // trainingOfferEnabled
+        3800, // trainingOfferBasePrice
+        true, // trainingOfferSinglePayment
+        true, // trainingOfferTwoPayment
+        true, // trainingOfferThreePayment
+        3, // trainingOfferSpotsAvailable
+        'The $118,121 Problem Hiding in Your P&L', // trainingOfferHeadlinePrimary
+        'Transform Your Financial Literacy Into 30-50% Higher Profit Margins', // trainingOfferHeadlineSecondary
+        true, // trainingOfferGuaranteeEnabled
+        "If you don't identify meaningful profit improvements within 30 days, we'll continue working with you at no additional charge until you do." // trainingOfferGuaranteeText
       );
 
       // Keep modal open so user can see the reset took effect
@@ -428,6 +544,16 @@ const Settings: React.FC<SettingsProps> = ({
         }`}
       >
         Custom Terms
+      </button>
+      <button
+        onClick={() => setActiveTab('training-offer')}
+        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+          activeTab === 'training-offer'
+            ? 'bg-[#1239FF] text-white'
+            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+        }`}
+      >
+        Training Offer
       </button>
     </div>
   );
@@ -1287,6 +1413,240 @@ Examples:
     </div>
   );
 
+  const renderTrainingOfferSettings = () => (
+    <div className="space-y-8">
+      <div>
+        <h3 className="text-lg font-semibold mb-4">90 Day Profit Playbook Accelerator Program</h3>
+        <p className="text-sm text-gray-600 mb-6">
+          Configure the $3,800 training program that appears on the pricing page for qualified prospects.
+        </p>
+
+        <div className="space-y-6">
+          {/* Enable/Disable Toggle */}
+          <div className="mb-6">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={trainingOfferEnabled}
+                onChange={(e) => setTrainingOfferEnabled(e.target.checked)}
+                className="rounded border-gray-300 text-[#1239FF] h-4 w-4"
+              />
+              <span className="ml-2 text-sm font-medium text-gray-700">
+                Enable 90 Day Profit Playbook Accelerator Program
+              </span>
+            </label>
+            <p className="text-xs text-gray-500 mt-1 ml-6">
+              Shows the training offer panel on the pricing page when enabled
+            </p>
+          </div>
+
+          {trainingOfferEnabled && (
+            <>
+              {/* Pricing Configuration */}
+              <div className="space-y-4">
+                <h4 className="font-medium text-gray-700">Pricing Configuration</h4>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Base Price
+                  </label>
+                  <div className="flex items-center">
+                    <span className="text-gray-500 mr-2">$</span>
+                    <input
+                      type="number"
+                      value={trainingOfferBasePrice}
+                      onChange={(e) => setTrainingOfferBasePrice(Number(e.target.value))}
+                      className="w-32 rounded-md border border-gray-300 px-3 py-2"
+                      min="0"
+                      step="100"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Total price for the 90-day program
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-700">Payment Options</p>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="trainingPaymentPlan"
+                      value="1"
+                      checked={trainingOfferPaymentPlan === '1'}
+                      onChange={(e) => setTrainingOfferPaymentPlan(e.target.value as '1')}
+                      className="border-gray-300 text-[#1239FF] h-4 w-4"
+                    />
+                    <span className="ml-2 text-sm text-gray-600">
+                      Single Payment (${trainingOfferBasePrice})
+                    </span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="trainingPaymentPlan"
+                      value="2"
+                      checked={trainingOfferPaymentPlan === '2'}
+                      onChange={(e) => setTrainingOfferPaymentPlan(e.target.value as '2')}
+                      className="border-gray-300 text-[#1239FF] h-4 w-4"
+                    />
+                    <span className="ml-2 text-sm text-gray-600">
+                      2 Payments (${Math.round(trainingOfferBasePrice / 2)} × 2)
+                    </span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="trainingPaymentPlan"
+                      value="3"
+                      checked={trainingOfferPaymentPlan === '3'}
+                      onChange={(e) => setTrainingOfferPaymentPlan(e.target.value as '3')}
+                      className="border-gray-300 text-[#1239FF] h-4 w-4"
+                    />
+                    <span className="ml-2 text-sm text-gray-600">
+                      3 Monthly Payments (${Math.round(trainingOfferBasePrice / 3)} × 3)
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Availability Settings */}
+              <div className="space-y-4">
+                <h4 className="font-medium text-gray-700">Availability Settings</h4>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Available Spots
+                  </label>
+                  <input
+                    type="number"
+                    value={trainingOfferSpotsAvailable}
+                    onChange={(e) => setTrainingOfferSpotsAvailable(Number(e.target.value))}
+                    className="w-24 rounded-md border border-gray-300 px-3 py-2"
+                    min="1"
+                    max="10"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Number of client spots available (creates urgency)
+                  </p>
+                </div>
+              </div>
+
+              {/* Copy Customization */}
+              <div className="space-y-4">
+                <h4 className="font-medium text-gray-700">Copy Customization</h4>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Primary Headline
+                  </label>
+                  <input
+                    type="text"
+                    value={trainingOfferHeadlinePrimary}
+                    onChange={(e) => setTrainingOfferHeadlinePrimary(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2"
+                    placeholder="The $118,121 Problem Hiding in Your P&L"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Secondary Headline
+                  </label>
+                  <input
+                    type="text"
+                    value={trainingOfferHeadlineSecondary}
+                    onChange={(e) => setTrainingOfferHeadlineSecondary(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2"
+                    placeholder="Transform Your Financial Literacy Into 30-50% Higher Profit Margins"
+                  />
+                </div>
+              </div>
+
+              {/* Guarantee Settings */}
+              <div className="space-y-4">
+                <h4 className="font-medium text-gray-700">Guarantee Settings</h4>
+
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={trainingOfferGuaranteeEnabled}
+                    onChange={(e) => setTrainingOfferGuaranteeEnabled(e.target.checked)}
+                    className="rounded border-gray-300 text-[#1239FF] h-4 w-4"
+                  />
+                  <span className="ml-2 text-sm font-medium text-gray-700">
+                    Show Guarantee
+                  </span>
+                </label>
+
+                {trainingOfferGuaranteeEnabled && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Guarantee Text
+                    </label>
+                    <textarea
+                      value={trainingOfferGuaranteeText}
+                      onChange={(e) => setTrainingOfferGuaranteeText(e.target.value)}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2"
+                      rows={3}
+                      placeholder="If you don't identify meaningful profit improvements..."
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Preview Section */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-900 mb-3">Preview</h4>
+                <div className="bg-white border border-blue-300 rounded-lg p-4">
+                  <div className="space-y-2">
+                    <p className="text-xs text-red-600 font-medium">
+                      Only {trainingOfferSpotsAvailable} Spots Available This Month
+                    </p>
+                    <h3 className="text-lg font-bold text-gray-900">
+                      {trainingOfferHeadlinePrimary}
+                    </h3>
+                    <p className="text-sm text-gray-700">
+                      {trainingOfferHeadlineSecondary}
+                    </p>
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <p className="text-lg font-bold text-gray-900">
+                        Investment: ${trainingOfferBasePrice}
+                      </p>
+                      <div className="text-sm text-gray-600 mt-1">
+                        {trainingOfferPaymentPlan === '1' && <div>• Pay in Full: ${trainingOfferBasePrice}</div>}
+                        {trainingOfferPaymentPlan === '2' && <div>• 2 Payments: ${Math.round(trainingOfferBasePrice / 2)} × 2</div>}
+                        {trainingOfferPaymentPlan === '3' && <div>• 3 Monthly: ${Math.round(trainingOfferBasePrice / 3)} × 3</div>}
+                      </div>
+                      {trainingOfferGuaranteeEnabled && (
+                        <div className="mt-3 p-2 bg-green-50 rounded text-xs text-green-800">
+                          ✓ {trainingOfferGuaranteeText}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Info Box */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h4 className="font-medium text-yellow-900 mb-2">Important Notes</h4>
+                <ul className="text-sm text-yellow-800 space-y-1 list-disc list-inside">
+                  <li>All claims are backed by research citations for legal compliance</li>
+                  <li>Sales script panel appears when admin=true and offer is enabled</li>
+                  <li>Integrates with QuickBooks analysis for personalized demos</li>
+                  <li>Weekly accountability sessions are individual, not group calls</li>
+                  <li>Harvard Business Review: 30-50% higher margins for financial trackers</li>
+                  <li>Intuit QuickBooks: $118,121 average loss from poor financial literacy</li>
+                </ul>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   const renderRoyaltyProcessingSettings = () => (
     <div className="space-y-8">
       <div>
@@ -1475,6 +1835,7 @@ Examples:
                activeTab === 'royalty-processing' ? renderRoyaltyProcessingSettings() :
                activeTab === 'onboarding-fee' ? renderOnboardingFeeSettings() :
                activeTab === 'custom-terms' ? renderCustomTermsSettings() :
+               activeTab === 'training-offer' ? renderTrainingOfferSettings() :
                renderPlanSettings(activeTab as PlanType)}
             </div>
 
@@ -1498,7 +1859,7 @@ Examples:
                   onClick={handleSave}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
                 >
-                  Save Changes
+                  Save and Close
                 </button>
               </div>
             </div>
