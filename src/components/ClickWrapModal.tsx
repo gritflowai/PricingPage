@@ -24,11 +24,31 @@ export default function ClickWrapModal({
 
   const handleCopyLink = async () => {
     try {
+      // Try modern clipboard API first
       await navigator.clipboard.writeText(formUrl);
       alert('Form link copied to clipboard!');
     } catch (err) {
-      console.error('Failed to copy:', err);
-      alert('Failed to copy link. Please try again.');
+      // Fallback for embedded iframes where clipboard API is restricted
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = formUrl;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textarea);
+
+        if (successful) {
+          alert('Form link copied to clipboard!');
+        } else {
+          throw new Error('execCommand failed');
+        }
+      } catch (fallbackErr) {
+        console.error('Failed to copy:', err, fallbackErr);
+        alert('Failed to copy link. Please try again.');
+      }
     }
   };
 

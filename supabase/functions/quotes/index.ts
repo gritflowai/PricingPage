@@ -44,6 +44,8 @@ interface UpdateQuoteRequest {
   summary: {
     subtotal: number;
     final_monthly_price: number;
+    subscription_price?: number;
+    subscription_price_per_unit?: number;
     price_per_unit: number;
     annual_savings: number;
     price_breakdown: Record<string, any>;
@@ -185,19 +187,36 @@ Deno.serve(async (req: Request) => {
 
       const now = new Date().toISOString();
 
-      // Update quote only if status is draft
-      const { data, error } = await supabase
-        .from('quotes')
-        .update({
+      // Extract core fields from selection_raw if available
+      const selectionRaw = body.summary.selection_raw || {};
+      const updateData: any = {
           subtotal: body.summary.subtotal,
           final_monthly_price: body.summary.final_monthly_price,
+          subscription_price: body.summary.subscription_price,
+          subscription_price_per_unit: body.summary.subscription_price_per_unit,
           price_per_unit: body.summary.price_per_unit,
           annual_savings: body.summary.annual_savings,
           price_breakdown: body.summary.price_breakdown,
           plan_details: body.summary.plan_details,
-          selection_raw: body.summary.selection_raw || {},
+          selection_raw: selectionRaw,
           updated_at: now,
-        })
+      };
+
+      // Also update the core fields from selection_raw
+      if (selectionRaw.selectedPlan !== undefined) {
+        updateData.selected_plan = selectionRaw.selectedPlan;
+      }
+      if (selectionRaw.count !== undefined) {
+        updateData.count = selectionRaw.count;
+      }
+      if (selectionRaw.isAnnual !== undefined) {
+        updateData.is_annual = selectionRaw.isAnnual;
+      }
+
+      // Update quote only if status is draft
+      const { data, error } = await supabase
+        .from('quotes')
+        .update(updateData)
         .eq('id', body.id)
         .eq('status', 'draft')
         .select()

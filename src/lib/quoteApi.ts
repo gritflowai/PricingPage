@@ -15,6 +15,8 @@ const API_BASE_URL = 'https://ijlpiwxodfsjmexktcoc.supabase.co/functions/v1'
 
 // Helper function for fetch with error handling
 async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  console.log(`[apiFetch] Calling ${endpoint}`);
+
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers: {
@@ -26,8 +28,10 @@ async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> 
   })
 
   const data = await response.json()
+  console.log(`[apiFetch] Response status: ${response.status}, ok: ${response.ok}`);
 
   if (!response.ok) {
+    console.error(`[apiFetch] Error response:`, data);
     throw new Error(data.error || `API error: ${response.status}`)
   }
 
@@ -62,10 +66,25 @@ export async function updateQuote(
   id: string,
   summary: QuoteSummary
 ): Promise<Quote> {
-  return apiFetch<Quote>('/quotes/update', {
+  console.log('[quoteApi.updateQuote] Sending to Edge Function:', {
+    id,
+    count: summary.selection_raw?.count,
+    selectedPlan: summary.selection_raw?.selectedPlan,
+    isAnnual: summary.selection_raw?.isAnnual
+  });
+
+  const result = await apiFetch<Quote>('/quotes/update', {
     method: 'POST',
     body: JSON.stringify({ id, summary }),
-  })
+  });
+
+  console.log('[quoteApi.updateQuote] Response from Edge Function:', {
+    count: result.count,
+    selected_plan: result.selected_plan,
+    is_annual: result.is_annual
+  });
+
+  return result;
 }
 
 export async function lockQuote(

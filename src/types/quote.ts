@@ -39,7 +39,9 @@ export interface PricingModel {
 export interface QuoteSummary {
   subtotal: number
   final_monthly_price: number
-  price_per_unit: number
+  subscription_price?: number
+  subscription_price_per_unit?: number
+  price_per_unit?: number
   annual_savings: number
   price_breakdown: Record<string, any>
   plan_details: Record<string, any>

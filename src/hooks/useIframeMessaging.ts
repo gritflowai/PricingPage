@@ -95,6 +95,7 @@ export interface IncomingMessage {
     acceptedAt?: string;
     enabled?: boolean;
     // INIT_QUOTE data fields
+    userType?: 'cpa' | 'franchisee' | 'smb';
     selectedPlan?: string;
     count?: number;
     isAnnual?: boolean;

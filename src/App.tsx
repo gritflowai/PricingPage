@@ -507,6 +507,11 @@ function App() {
             if (existingQuote.selection_raw) {
               const raw = existingQuote.selection_raw as any;
 
+              // Restore user type
+              if (raw.userType) {
+                setUserType(raw.userType);
+              }
+
               // Restore projected locations
               if (raw.projectedLocations) {
                 setProjectedLocations(raw.projectedLocations);
@@ -552,6 +557,18 @@ function App() {
                 setOnboardingFeeAmount(0);
                 setOnboardingFeeTitle('Custom Onboarding Fee');
                 setOnboardingFeeDescription('Setup sCOA, hierarchy, benchmarking, KPI reporting and forecasting, and setup custom scorecards. This is white-glove onboarding with dedicated support to ensure your success from day one.');
+              }
+
+              // Restore custom terms
+              if (raw.customTerms) {
+                setCustomTermsEnabled(raw.customTerms.enabled || false);
+                setCustomTermsTitle(raw.customTerms.title || 'Custom Terms & Conditions');
+                setCustomTermsContent(raw.customTerms.content || '');
+              } else {
+                // Clear custom terms if not in quote
+                setCustomTermsEnabled(false);
+                setCustomTermsTitle('Custom Terms & Conditions');
+                setCustomTermsContent('');
               }
             }
 
@@ -690,9 +707,18 @@ function App() {
 
   // Debounced quote updates (only in draft mode)
   useEffect(() => {
+    console.log('[Auto-Save Debug]', {
+      quoteMode,
+      quoteStatus,
+      formId,
+      count,
+      shouldSave: quoteMode && quoteStatus === 'draft' && formId
+    });
+
     if (!quoteMode || quoteStatus !== 'draft' || !formId) return;
 
     const timer = setTimeout(async () => {
+      console.log('[Auto-Save] Attempting to save quote with count:', count);
       try {
         const summary: QuoteSummary = {
           subtotal: totalPrice,
@@ -720,6 +746,7 @@ function App() {
             aiTokens: calculatedAiTokens,
           },
           selection_raw: {
+            userType,
             selectedPlan,
             count,
             isAnnual,
@@ -751,7 +778,10 @@ function App() {
           },
         };
 
-        await quoteApi.updateQuote(formId, summary);
+        const response = await quoteApi.updateQuote(formId, summary);
+        console.log('[Auto-Save] Quote response:', response);
+        console.log('[Auto-Save] Quote successfully saved with count:', count);
+        console.log('[Auto-Save] Check database - response count:', response?.count);
 
         // Emit QUOTE_SUMMARY_UPDATE message
         sendQuoteMessage('QUOTE_SUMMARY_UPDATE', {
@@ -782,6 +812,7 @@ function App() {
     quoteMode,
     quoteStatus,
     formId,
+    userType,
     selectedPlan,
     count,
     isAnnual,
@@ -807,6 +838,9 @@ function App() {
     onboardingFeeAmount,
     onboardingFeeTitle,
     onboardingFeeDescription,
+    customTermsEnabled,
+    customTermsTitle,
+    customTermsContent,
     currentPricingModelId,
     isInIframe,
     embedConfig,
@@ -1147,6 +1181,9 @@ function App() {
         setWaitingForInit(false);
 
         // Apply selections from INIT_QUOTE data
+        if (data?.userType) {
+          setUserType(data.userType);
+        }
         if (data?.selectedPlan) {
           setSelectedPlan(data.selectedPlan as PlanType);
         }
@@ -1230,11 +1267,31 @@ function App() {
     const shareUrl = `${baseUrl}?mode=quote&formId=${formId}`;
 
     try {
+      // Try modern clipboard API first
       await navigator.clipboard.writeText(shareUrl);
       alert('Quote link copied to clipboard!');
     } catch (err) {
-      console.error('Failed to copy:', err);
-      alert('Failed to copy link. Please try again.');
+      // Fallback for embedded iframes where clipboard API is restricted
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = shareUrl;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textarea);
+
+        if (successful) {
+          alert('Quote link copied to clipboard!');
+        } else {
+          throw new Error('execCommand failed');
+        }
+      } catch (fallbackErr) {
+        console.error('Failed to copy:', err, fallbackErr);
+        alert('Failed to copy link. Please try again.');
+      }
     }
   };
 
@@ -1642,8 +1699,6 @@ function App() {
 
                     <a
                       href="https://auth.autymate.com/Register"
-                      target="_blank"
-                      rel="noopener noreferrer"
                       onClick={() => {
                         sendUserAction('START_FREE_TRIAL', {
                           userType,
@@ -2217,6 +2272,9 @@ function App() {
         count={isEnterpriseRequest ? 0 : count}
         planName={isEnterpriseRequest ? "Enterprise" : currentPlan.name}
         unitLabel={selectedPlan === 'ai-advisor' ? 'users' : terminology.plural}
+        userData={{
+          formId: formId || undefined
+        }}
         estimatedMonthlyMin={Math.round(finalPrice * 0.70)}
         estimatedMonthlyMax={Math.round(finalPrice * 0.85)}
         currentMonthlyPrice={Math.round(finalPrice)}

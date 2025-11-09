@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Edge Function</title>
+</head>
+<body>
+    <h1>Test Edge Function - Quote Update</h1>
+    <button onclick="testUpdate()">Test Update Quote</button>
+    <pre id="result"></pre>
+
+    <script>
+        const API_BASE_URL = 'https://ijlpiwxodfsjmexktcoc.supabase.co/functions/v1';
+        const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqbHBpd3hvZGZzam1leGt0Y29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzA0OTQ1MzcsImV4cCI6MjA0NjA3MDUzN30.u5bvmNS5p1YjtzkCPXdqiCX88fxOP7bEfQ0voNRgtlY';
+
+        async function testUpdate() {
+            const resultEl = document.getElementById('result');
+            resultEl.textContent = 'Testing...';
+
+            try {
+                // Test updating the quote with count = 38
+                const testData = {
+                    id: '47f05360-1111-4a9b-a662-8a15a84d6126',
+                    summary: {
+                        subtotal: 3750,
+                        final_monthly_price: 3150,
+                        subscription_price: 3150,
+                        subscription_price_per_unit: 82.89,
+                        annual_savings: 420,
+                        price_breakdown: {
+                            subtotal: 3750,
+                            volumeDiscount: 0,
+                            customDiscount: 0,
+                            wholesaleDiscount: 0,
+                            annualSavings: 420,
+                            subscriptionPrice: 3150,
+                            royaltyProcessingFee: 0,
+                            finalMonthlyPrice: 3150
+                        },
+                        plan_details: {
+                            name: 'Starter',
+                            connections: 1,
+                            users: 38,
+                            scorecards: 38,
+                            aiTokens: 9450
+                        },
+                        selection_raw: {
+                            userType: 'franchisee',
+                            selectedPlan: 'starter',
+                            count: 38,  // THIS IS THE KEY FIELD WE'RE TESTING
+                            isAnnual: true,
+                            projectedLocations: null,
+                            customDiscount: null,
+                            royaltyProcessing: null,
+                            onboardingFee: null,
+                            customTerms: null
+                        }
+                    }
+                };
+
+                const response = await fetch(`${API_BASE_URL}/quotes/update`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': ANON_KEY,
+                        'Authorization': `Bearer ${ANON_KEY}`
+                    },
+                    body: JSON.stringify(testData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    resultEl.textContent = 'SUCCESS!\n\n' +
+                        'Response count field: ' + result.count + '\n' +
+                        'Expected: 38\n' +
+                        'Match: ' + (result.count === 38 ? '✅ YES' : '❌ NO') + '\n\n' +
+                        'Full response:\n' + JSON.stringify(result, null, 2);
+
+                    if (result.count !== 38) {
+                        resultEl.textContent += '\n\n⚠️ WARNING: The Edge Function is NOT updating the count field!\n' +
+                            'This means the Edge Function needs to be deployed.';
+                    }
+                } else {
+                    resultEl.textContent = 'ERROR:\n' + JSON.stringify(result, null, 2);
+                }
+            } catch (error) {
+                resultEl.textContent = 'ERROR: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
