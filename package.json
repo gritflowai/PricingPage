@@ -6,8 +6,7 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
-    "build": "vite build && npm run copy:landing",
-    "copy:landing": "node -e \"const fs=require('fs'); const path=require('path'); fs.copyFileSync('profit-accelerator-landing.html','dist/profit-accelerator-landing.html'); const srcDir='src/assets'; const destDir='dist/src/assets'; fs.mkdirSync(destDir,{recursive:true}); fs.cpSync(srcDir,destDir,{recursive:true});\"",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
