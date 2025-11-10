@@ -1494,8 +1494,8 @@ function App() {
   const handleCopyShareLink = async () => {
     if (!formId) return;
 
-    const baseUrl = window.location.origin + window.location.pathname;
-    const shareUrl = `${baseUrl}?mode=quote&formId=${formId}`;
+    // Always generate link to pricing.auty.io with the formId
+    const shareUrl = `https://pricing.auty.io?mode=quote&formId=${formId}`;
 
     try {
       // Try modern clipboard API first
