@@ -63,11 +63,22 @@ export function SalesScriptPanel({ isVisible, config }: SalesScriptPanelProps) {
     <div className="sales-script-panel fixed bottom-20 right-4 w-96 max-h-[80vh] overflow-y-auto bg-white rounded-lg shadow-xl border border-gray-200 z-50">
       <div className="sticky top-0 bg-white border-b border-gray-200 p-4 z-10">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900 flex items-center">
+          <h2 className="text-xl font-bold text-gray-900 flex items-center flex-1">
             <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            90 Day Profit Playbook Accelerator Program Sales Guide
+            <span className="flex-1">90 Day Profit Playbook Accelerator Program Sales Guide</span>
+            <a
+              href="profit-accelerator-landing.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-1 rounded-md font-semibold text-xs hover:scale-105 transition-all mr-2"
+            >
+              Learn More
+              <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
           </h2>
           <button
             onClick={() => setIsMinimized(true)}

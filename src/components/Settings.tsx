@@ -424,9 +424,9 @@ const Settings: React.FC<SettingsProps> = ({
     };
 
     return (
-      <div className="bg-gray-50 border-b border-gray-200 px-6 py-2">
-        <div className="flex items-center gap-4 text-xs text-gray-600">
-          <div className="flex items-center gap-2">
+      <div className="bg-gray-50 border-b border-gray-200 px-4 py-1.5">
+        <div className="flex items-center gap-3 text-xs text-gray-600 flex-wrap">
+          <div className="flex items-center gap-1.5">
             <span className="font-medium">Quote Status:</span>
             {getStatusBadge()}
           </div>
@@ -454,10 +454,10 @@ const Settings: React.FC<SettingsProps> = ({
   };
 
   const renderPricingTabs = () => (
-    <div className="flex space-x-2 mt-4">
+    <div className="flex flex-wrap gap-1.5 mt-3">
       <button
         onClick={() => setActiveTab('ai-advisor')}
-        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+        className={`px-2 py-1 rounded-md font-medium transition-colors text-xs ${
           activeTab === 'ai-advisor'
             ? 'bg-[#1239FF] text-white'
             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -467,7 +467,7 @@ const Settings: React.FC<SettingsProps> = ({
       </button>
       <button
         onClick={() => setActiveTab('starter')}
-        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+        className={`px-2 py-1 rounded-md font-medium transition-colors text-xs ${
           activeTab === 'starter'
             ? 'bg-[#1239FF] text-white'
             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -477,7 +477,7 @@ const Settings: React.FC<SettingsProps> = ({
       </button>
       <button
         onClick={() => setActiveTab('growth')}
-        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+        className={`px-2 py-1 rounded-md font-medium transition-colors text-xs ${
           activeTab === 'growth'
             ? 'bg-[#1239FF] text-white'
             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -487,7 +487,7 @@ const Settings: React.FC<SettingsProps> = ({
       </button>
       <button
         onClick={() => setActiveTab('scale')}
-        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+        className={`px-2 py-1 rounded-md font-medium transition-colors text-xs ${
           activeTab === 'scale'
             ? 'bg-[#1239FF] text-white'
             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -497,7 +497,7 @@ const Settings: React.FC<SettingsProps> = ({
       </button>
       <button
         onClick={() => setActiveTab('reseller')}
-        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+        className={`px-2 py-1 rounded-md font-medium transition-colors text-xs ${
           activeTab === 'reseller'
             ? 'bg-[#1239FF] text-white'
             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -507,7 +507,7 @@ const Settings: React.FC<SettingsProps> = ({
       </button>
       <button
         onClick={() => setActiveTab('discounts')}
-        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+        className={`px-2 py-1 rounded-md font-medium transition-colors text-xs ${
           activeTab === 'discounts'
             ? 'bg-[#1239FF] text-white'
             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -517,7 +517,7 @@ const Settings: React.FC<SettingsProps> = ({
       </button>
       <button
         onClick={() => setActiveTab('royalty-processing')}
-        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+        className={`px-2 py-1 rounded-md font-medium transition-colors text-xs ${
           activeTab === 'royalty-processing'
             ? 'bg-[#1239FF] text-white'
             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -527,7 +527,7 @@ const Settings: React.FC<SettingsProps> = ({
       </button>
       <button
         onClick={() => setActiveTab('onboarding-fee')}
-        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+        className={`px-2 py-1 rounded-md font-medium transition-colors text-xs ${
           activeTab === 'onboarding-fee'
             ? 'bg-[#1239FF] text-white'
             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -537,7 +537,7 @@ const Settings: React.FC<SettingsProps> = ({
       </button>
       <button
         onClick={() => setActiveTab('custom-terms')}
-        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+        className={`px-2 py-1 rounded-md font-medium transition-colors text-xs ${
           activeTab === 'custom-terms'
             ? 'bg-[#1239FF] text-white'
             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -547,7 +547,7 @@ const Settings: React.FC<SettingsProps> = ({
       </button>
       <button
         onClick={() => setActiveTab('training-offer')}
-        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+        className={`px-2 py-1 rounded-md font-medium transition-colors text-xs ${
           activeTab === 'training-offer'
             ? 'bg-[#1239FF] text-white'
             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -1806,17 +1806,17 @@ Examples:
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full mx-4 max-h-[90vh] overflow-hidden">
-            <div className="border-b border-gray-200">
-              <div className="p-6 pb-3">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="border-b border-gray-200 flex-shrink-0">
+              <div className="px-4 py-3">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-gray-900">Pricing Settings</h2>
+                  <h2 className="text-lg font-bold text-gray-900">Pricing Settings</h2>
                   <button
                     onClick={() => setIsOpen(false)}
                     className="text-gray-400 hover:text-gray-600"
                   >
-                    <X className="w-6 h-6" />
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
               </div>
@@ -1824,12 +1824,12 @@ Examples:
               {/* Quote Status Indicator */}
               {renderQuoteStatusIndicator()}
 
-              <div className="px-6 pb-6">
+              <div className="px-4 pb-3">
                 {renderPricingTabs()}
               </div>
             </div>
 
-            <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 280px)' }}>
+            <div className="flex-1 overflow-y-auto px-4 py-4">
               {activeTab === 'reseller' ? renderResellerSettings() :
                activeTab === 'discounts' ? renderDiscountsSettings() :
                activeTab === 'royalty-processing' ? renderRoyaltyProcessingSettings() :
@@ -1839,27 +1839,27 @@ Examples:
                renderPlanSettings(activeTab as PlanType)}
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-between items-center">
+            <div className="px-4 py-3 border-t border-gray-200 flex justify-between items-center flex-shrink-0">
               <button
                 onClick={handleReset}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                className="px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2 text-sm"
                 title="Reset all pricing settings to defaults"
               >
-                <RotateCcw className="w-4 h-4" />
+                <RotateCcw className="w-3.5 h-3.5" />
                 Reset to Defaults
               </button>
-              <div className="flex gap-4">
+              <div className="flex gap-2">
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="px-3 py-1.5 text-gray-700 hover:bg-gray-100 rounded-md transition-colors text-sm"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  className="px-3 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors text-sm"
                 >
-                  Save and Close
+                  Save Changes
                 </button>
               </div>
             </div>

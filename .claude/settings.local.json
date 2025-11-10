@@ -21,7 +21,8 @@
       "Bash(npx supabase functions deploy:*)",
       "Bash(npx supabase link:*)",
       "Bash(npx supabase functions:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(git push)"
     ],
     "deny": [],
     "ask": []
