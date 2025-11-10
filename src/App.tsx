@@ -735,13 +735,47 @@ function App() {
             setQuoteLoadComplete(true);
             console.log('[PricingCalculator] Quote loaded successfully, sent QUOTE_ID_READY');
           } catch (error: any) {
-            // Phase 2: Quote doesn't exist - wait for INIT_QUOTE message
+            // Phase 2: Quote doesn't exist
             if (error?.message?.includes('Quote not found') || error?.message?.includes('404')) {
-              console.log('[PricingCalculator] Quote not found, waiting for INIT_QUOTE message from parent...');
-              setWaitingForInit(true);
-              // Mark as complete since we're waiting for INIT_QUOTE (new quote scenario)
-              setQuoteLoadComplete(true);
-              // Don't send error - this is expected for new quotes
+              // Check if we're in an iframe or standalone mode
+              if (isInIframe) {
+                // Embedded mode: Wait for INIT_QUOTE message from parent
+                console.log('[PricingCalculator] Quote not found, waiting for INIT_QUOTE message from parent...');
+                setWaitingForInit(true);
+                setQuoteLoadComplete(true);
+              } else {
+                // Standalone mode: Create quote immediately with URL parameters
+                console.log('[PricingCalculator] Quote not found, creating new quote in standalone mode...');
+                try {
+                  const newQuote = await quoteApi.initQuote({
+                    id: formId,
+                    selected_plan: selectedPlan,
+                    count: count,
+                    is_annual: isAnnual,
+                  });
+
+                  console.log('[PricingCalculator] Created new quote in standalone mode:', newQuote.id);
+                  setCurrentPricingModelId(newQuote.pricing_model_id || null);
+                  setQuoteLoadComplete(true);
+
+                  // Send QUOTE_ID_READY (even though no parent, for consistency)
+                  sendQuoteMessage('QUOTE_ID_READY', {
+                    id: formId,
+                    status: 'draft',
+                    version: 1,
+                  });
+
+                  console.log('[PricingCalculator] Quote initialized successfully in standalone mode');
+                } catch (createError) {
+                  console.error('[PricingCalculator] Failed to create quote in standalone mode:', createError);
+                  sendQuoteError(
+                    createError instanceof Error ? createError.message : 'Failed to create quote',
+                    'UNKNOWN',
+                    { createError }
+                  );
+                  setQuoteLoadComplete(true);
+                }
+              }
             } else {
               // Real error (network, etc.) - report it
               throw error;
