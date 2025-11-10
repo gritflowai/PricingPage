@@ -487,7 +487,7 @@ const FeatureComparison: React.FC<FeatureComparisonProps> = ({ selectedPlan, use
                                         One-Time Fee
                                       </span>
                                       <a
-                                        href="profit-accelerator-landing.html"
+                                        href="https://pricing.auty.io/profit-accelerator-landing.html"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="inline-flex items-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-lg font-semibold text-sm hover:scale-105 transition-all"
@@ -686,7 +686,7 @@ const FeatureComparison: React.FC<FeatureComparisonProps> = ({ selectedPlan, use
                         </p>
                       </div>
                       <a
-                        href="profit-accelerator-landing.html"
+                        href="https://pricing.auty.io/profit-accelerator-landing.html"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center justify-center w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-2 rounded-lg font-semibold text-xs hover:scale-105 transition-all mt-3"

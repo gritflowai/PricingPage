@@ -69,7 +69,7 @@ export function SalesScriptPanel({ isVisible, config }: SalesScriptPanelProps) {
             </svg>
             <span className="flex-1">90 Day Profit Playbook Accelerator Program Sales Guide</span>
             <a
-              href="profit-accelerator-landing.html"
+              href="https://pricing.auty.io/profit-accelerator-landing.html"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-1 rounded-md font-semibold text-xs hover:scale-105 transition-all mr-2"
