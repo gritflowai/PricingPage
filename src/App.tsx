@@ -1884,6 +1884,85 @@ function App() {
                   )}
                 </div>
               )}
+
+              {/* Plan Includes */}
+              <div className="bg-[#F0F4FF] rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-[#180D43] mb-3">Plan Includes</h3>
+
+                {/* Primary Features - Always visible (first 4 for standard plans, all for AI advisor) */}
+                <div className="grid grid-cols-2 gap-3">
+                  {planFeatures.slice(0, selectedPlan === 'ai-advisor' ? planFeatures.length : 4).map((feature, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <i className={`${feature.icon} text-[#1239FF] text-base`} aria-label={feature.label} role="img"></i>
+                      <div className="flex items-center gap-1">
+                        <div>
+                          <span className="font-semibold text-[#1239FF]">{feature.value}</span>
+                          <span className="text-sm text-[#180D43] ml-1">{feature.label}</span>
+                        </div>
+                        <Tooltip content={feature.tooltip} position="top" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Collapsible Additional Details - Only for non-AI Advisor plans */}
+                {selectedPlan !== 'ai-advisor' && (
+                  <>
+                    {/* Expand/Collapse Button */}
+                    <button
+                      onClick={() => setShowPlanDetails(!showPlanDetails)}
+                      className="flex items-center justify-center gap-2 text-sm text-[#1239FF] hover:text-[#1239FF]/80 font-medium w-full py-2 mt-3"
+                    >
+                      {showPlanDetails ? 'Hide' : 'Show'} additional details
+                      <ChevronDown className={`w-4 h-4 transition-transform ${showPlanDetails ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {/* Expandable Section */}
+                    {showPlanDetails && (
+                      <div className="mt-3 pt-3 border-t border-gray-300">
+                        {/* Additional Quantifiable Features (indexes 4+) */}
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                          {planFeatures.slice(4).map((feature, index) => (
+                            <div key={index + 4} className="flex items-center gap-2">
+                              <i className={`${feature.icon} text-[#1239FF] text-base`} aria-label={feature.label} role="img"></i>
+                              <div className="flex items-center gap-1">
+                                <div>
+                                  <span className="font-semibold text-[#1239FF]">{feature.value}</span>
+                                  <span className="text-sm text-[#180D43] ml-1">{feature.label}</span>
+                                </div>
+                                <Tooltip content={feature.tooltip} position="top" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Feature Flags */}
+                        {featureFlags.filter(feature => feature.enabled).length > 0 && (
+                          <>
+                            <h4 className="text-xs font-semibold text-[#180D43] mb-2 uppercase tracking-wide">Additional Features</h4>
+                            <div className="grid grid-cols-2 gap-3">
+                              {featureFlags.filter(feature => feature.enabled).map((feature, index) => (
+                                <div key={index} className="flex items-center gap-2">
+                                  <i className={`${feature.icon} text-[#1239FF] text-base`} aria-label={feature.label} role="img"></i>
+                                  <div className="flex items-center gap-1">
+                                    <div className="flex items-center gap-1.5">
+                                      <i className="fa-sharp fa-solid fa-circle-check text-green-600 text-sm"></i>
+                                      <span className="text-sm text-[#180D43]">
+                                        {feature.label}
+                                      </span>
+                                      <Tooltip content={feature.tooltip} position="top" />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -2531,84 +2610,6 @@ function App() {
                   </div>
                 </div>
               )}
-
-              <div className="bg-[#F0F4FF] rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-[#180D43] mb-3">Plan Includes</h3>
-
-                {/* Primary Features - Always visible (first 4 for standard plans, all for AI advisor) */}
-                <div className="grid grid-cols-2 gap-3">
-                  {planFeatures.slice(0, selectedPlan === 'ai-advisor' ? planFeatures.length : 4).map((feature, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <i className={`${feature.icon} text-[#1239FF] text-base`} aria-label={feature.label} role="img"></i>
-                      <div className="flex items-center gap-1">
-                        <div>
-                          <span className="font-semibold text-[#1239FF]">{feature.value}</span>
-                          <span className="text-sm text-[#180D43] ml-1">{feature.label}</span>
-                        </div>
-                        <Tooltip content={feature.tooltip} position="top" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Collapsible Additional Details - Only for non-AI Advisor plans */}
-                {selectedPlan !== 'ai-advisor' && (
-                  <>
-                    {/* Expand/Collapse Button */}
-                    <button
-                      onClick={() => setShowPlanDetails(!showPlanDetails)}
-                      className="flex items-center justify-center gap-2 text-sm text-[#1239FF] hover:text-[#1239FF]/80 font-medium w-full py-2 mt-3"
-                    >
-                      {showPlanDetails ? 'Hide' : 'Show'} additional details
-                      <ChevronDown className={`w-4 h-4 transition-transform ${showPlanDetails ? 'rotate-180' : ''}`} />
-                    </button>
-
-                    {/* Expandable Section */}
-                    {showPlanDetails && (
-                      <div className="mt-3 pt-3 border-t border-gray-300">
-                        {/* Additional Quantifiable Features (indexes 4+) */}
-                        <div className="grid grid-cols-2 gap-3 mb-3">
-                          {planFeatures.slice(4).map((feature, index) => (
-                            <div key={index + 4} className="flex items-center gap-2">
-                              <i className={`${feature.icon} text-[#1239FF] text-base`} aria-label={feature.label} role="img"></i>
-                              <div className="flex items-center gap-1">
-                                <div>
-                                  <span className="font-semibold text-[#1239FF]">{feature.value}</span>
-                                  <span className="text-sm text-[#180D43] ml-1">{feature.label}</span>
-                                </div>
-                                <Tooltip content={feature.tooltip} position="top" />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Feature Flags */}
-                        {featureFlags.filter(feature => feature.enabled).length > 0 && (
-                          <>
-                            <h4 className="text-xs font-semibold text-[#180D43] mb-2 uppercase tracking-wide">Additional Features</h4>
-                            <div className="grid grid-cols-2 gap-3">
-                              {featureFlags.filter(feature => feature.enabled).map((feature, index) => (
-                                <div key={index} className="flex items-center gap-2">
-                                  <i className={`${feature.icon} text-[#1239FF] text-base`} aria-label={feature.label} role="img"></i>
-                                  <div className="flex items-center gap-1">
-                                    <div className="flex items-center gap-1.5">
-                                      <i className="fa-sharp fa-solid fa-circle-check text-green-600 text-sm"></i>
-                                      <span className="text-sm text-[#180D43]">
-                                        {feature.label}
-                                      </span>
-                                      <Tooltip content={feature.tooltip} position="top" />
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
             </div>
           </div>
           )}
