@@ -1004,6 +1004,39 @@ function App() {
         console.log('[Auto-Save] Quote successfully saved with count:', count);
         console.log('[Auto-Save] Check database - response count:', response?.count);
 
+        // Build oneTimeFees array
+        const oneTimeFees = [];
+
+        // Add onboarding fee if configured
+        if (onboardingFeeAmount > 0) {
+          oneTimeFees.push({
+            amount: onboardingFeeAmount,
+            title: onboardingFeeTitle,
+            description: onboardingFeeDescription,
+            type: 'setup',
+            badge: 'ONE-TIME FEE'
+          });
+        }
+
+        // Add training offer if enabled
+        if (trainingOfferEnabled) {
+          const paymentTerms = [];
+          if (trainingOfferSinglePayment) paymentTerms.push('Single Payment');
+          if (trainingOfferTwoPayment) paymentTerms.push(`2 Payments: $${(trainingOfferBasePrice / 2).toFixed(2)} x 2`);
+          if (trainingOfferThreePayment) paymentTerms.push(`3 Payments: $${(trainingOfferBasePrice / 3).toFixed(2)} x 3`);
+
+          oneTimeFees.push({
+            amount: trainingOfferBasePrice,
+            title: trainingOfferHeadlinePrimary || '90 Day Profit Playbook Accelerator Program',
+            description: trainingOfferHeadlineSecondary || paymentTerms.join(', '),
+            type: 'training',
+            badge: 'ONE-TIME TRAINING FEE',
+            guarantee: trainingOfferGuaranteeEnabled ? trainingOfferGuaranteeText : undefined,
+            paymentTerms: paymentTerms.join(', '),
+            spotsAvailable: trainingOfferSpotsAvailable
+          });
+        }
+
         // Emit QUOTE_SUMMARY_UPDATE message
         sendQuoteMessage('QUOTE_SUMMARY_UPDATE', {
           id: formId,
@@ -1028,12 +1061,19 @@ function App() {
           royaltyProcessing: royaltyProcessingEnabled ? {
             enabled: true,
             flatFeePerLocation: royaltyBaseFee,
+            totalFee: royaltyProcessingFee,
+            perTransaction: royaltyPerTransaction,
+            estimatedTransactions: estimatedTransactions,
+            locationsCount: count,
           } : null,
+          // Keep single onboardingFee for backwards compatibility
           onboardingFee: onboardingFeeAmount > 0 ? {
             amount: onboardingFeeAmount,
             title: onboardingFeeTitle,
             description: onboardingFeeDescription,
           } : null,
+          // NEW: Array of all one-time fees (onboarding + training)
+          oneTimeFees: oneTimeFees.length > 0 ? oneTimeFees : undefined,
           customTerms: customTermsEnabled && customTermsContent ? {
             enabled: true,
             title: customTermsTitle,
