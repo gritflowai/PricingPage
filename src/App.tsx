@@ -756,6 +756,9 @@ function App() {
 
                   console.log('[PricingCalculator] Created new quote in standalone mode:', newQuote.id);
                   setCurrentPricingModelId(newQuote.pricing_model_id || null);
+
+                  // URL params are already applied to state (userType, projectedLocations, etc.)
+                  // Auto-save will persist all settings to database in 300ms
                   setQuoteLoadComplete(true);
 
                   // Send QUOTE_ID_READY (even though no parent, for consistency)
@@ -766,6 +769,14 @@ function App() {
                   });
 
                   console.log('[PricingCalculator] Quote initialized successfully in standalone mode');
+                  console.log('[PricingCalculator] URL params applied:', {
+                    userType,
+                    projectedLocations,
+                    selectedPlan,
+                    count,
+                    isAnnual
+                  });
+                  console.log('[PricingCalculator] Auto-save will persist all settings in 300ms');
                 } catch (createError) {
                   console.error('[PricingCalculator] Failed to create quote in standalone mode:', createError);
                   sendQuoteError(
@@ -1480,8 +1491,8 @@ function App() {
           setCustomTermsContent(data.customTerms.content);
         }
 
-        // Apply projected locations if provided
-        if (data?.projectedLocations !== undefined) {
+        // Apply projected locations if provided (only if explicitly set, not null)
+        if (data?.projectedLocations !== undefined && data?.projectedLocations !== null) {
           setProjectedLocations(data.projectedLocations);
         }
 
@@ -1506,8 +1517,10 @@ function App() {
         });
 
         // Mark quote load as complete after INIT_QUOTE
+        // This will trigger auto-save (300ms debounce) to persist all INIT_QUOTE settings
         setQuoteLoadComplete(true);
         console.log('[PricingCalculator] Quote initialized successfully, sent QUOTE_ID_READY');
+        console.log('[PricingCalculator] Auto-save will persist INIT_QUOTE settings in 300ms');
       } catch (error) {
         console.error('[PricingCalculator] Failed to initialize quote from INIT_QUOTE:', error);
         sendQuoteError(
