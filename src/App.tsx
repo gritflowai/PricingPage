@@ -1008,12 +1008,37 @@ function App() {
         sendQuoteMessage('QUOTE_SUMMARY_UPDATE', {
           id: formId,
           version: quoteStatus === 'locked' ? 2 : 1,
+          status: quoteStatus,
+          lockedAt: quoteLockedAt,
+          expiresAt: quoteExpiresAt,
           selectedPlan,
           count,
+          projectedLocations: projectedLocations || null, // Add at top level for form access
           isAnnual,
+          finalPrice: grandTotal,
           currency: 'USD',
           priceBreakdown: summary.price_breakdown,
           planDetails: summary.plan_details,
+          // Include optional fields at top level for easier form access
+          discount: customDiscountAmount > 0 && customDiscountType ? {
+            type: customDiscountType,
+            value: customDiscountValue,
+            reason: customDiscountReason,
+          } : null,
+          royaltyProcessing: royaltyProcessingEnabled ? {
+            enabled: true,
+            flatFeePerLocation: royaltyBaseFee,
+          } : null,
+          onboardingFee: onboardingFeeAmount > 0 ? {
+            amount: onboardingFeeAmount,
+            title: onboardingFeeTitle,
+            description: onboardingFeeDescription,
+          } : null,
+          customTerms: customTermsEnabled && customTermsContent ? {
+            enabled: true,
+            title: customTermsTitle,
+            content: customTermsContent,
+          } : null,
           selectionRaw: summary.selection_raw,
           pricingModelId: currentPricingModelId,
           expiresInDays: embedConfig.expiresInDays,
