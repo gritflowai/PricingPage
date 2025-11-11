@@ -1420,10 +1420,9 @@ function App() {
   const handleModalAcceptQuote = () => {
     if (!formId) return;
 
-    // Generate the form URL with formId parameter and step=pricing to navigate directly to pricing step
-    // Use the current domain instead of hardcoded URL
-    const baseUrl = window.location.origin;
-    const formUrl = `${baseUrl}/?formId=${formId}&step=pricing`;
+    // Generate the form URL with uid parameter and step=pricing to navigate directly to pricing step
+    // Use auty.io domain (main onboarding form)
+    const formUrl = `https://auty.io/?uid=${formId}&step=pricing`;
 
     // Open in new tab
     window.open(formUrl, '_blank');
@@ -2775,7 +2774,7 @@ function App() {
           count: count,
           isAnnual: isAnnual,
         }}
-        formUrl={`${window.location.origin}/?formId=${formId || ''}&step=pricing`}
+        formUrl={`https://auty.io/?uid=${formId || ''}&step=pricing`}
       />
       </div>
     </div>
