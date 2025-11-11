@@ -1628,27 +1628,29 @@ function App() {
                 setShowContactModal(true);
               }}
             />
-            {/* Minimalistic copy quote button - tiny period style */}
+            {/* Copy Quote Link Button */}
             {formId && (
-              <button
-                onClick={handleCopyShareLink}
-                className="fixed top-5 right-5 z-50 w-3 h-3 bg-gray-500 hover:bg-blue-600 rounded-full transition-all hover:w-8 hover:h-8 group flex items-center justify-center"
-                title="Copy quote link"
-              >
-                <svg
-                  className="w-0 h-0 group-hover:w-4 group-hover:h-4 text-white transition-all"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+              <div className="mb-3">
+                <button
+                  onClick={handleCopyShareLink}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:border-[#1239FF] hover:bg-blue-50 hover:text-[#1239FF] transition-all shadow-sm"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-              </button>
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                    />
+                  </svg>
+                  Copy Quote Link
+                </button>
+              </div>
             )}
           </>
         )}
