@@ -1033,7 +1033,9 @@ function App() {
             badge: 'ONE-TIME TRAINING FEE',
             guarantee: trainingOfferGuaranteeEnabled ? trainingOfferGuaranteeText : undefined,
             paymentTerms: paymentTerms.join(', '),
-            spotsAvailable: trainingOfferSpotsAvailable
+            spotsAvailable: trainingOfferSpotsAvailable,
+            learnMoreUrl: 'https://www.auty.io/90-day-profit-playbook', // Link to training program landing page
+            urgencyText: trainingOfferUrgencyText || 'Only 3 Spots Available This Month'
           });
         }
 
