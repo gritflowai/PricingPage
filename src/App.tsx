@@ -821,7 +821,13 @@ function App() {
   }, []); // Only run once on mount
 
   // Send selection updates whenever pricing-related state changes
+  // Only for non-quote embedded mode (quote mode uses QUOTE_SUMMARY_UPDATE instead)
   useEffect(() => {
+    // Guard: Only send messages when embedded in iframe AND not in quote mode
+    // Quote mode has its own QUOTE_SUMMARY_UPDATE handler, so skip here
+    // Also skip if document is hidden (user on different tab/page)
+    if (!isInIframe || quoteMode || document.hidden) return;
+
     if (count < currentPlan.contactThreshold || isLocked || adminMode) {
       sendSelectionUpdate({
         userType,
@@ -876,6 +882,8 @@ function App() {
       });
     }
   }, [
+    isInIframe,
+    quoteMode,
     userType,
     selectedPlan,
     count,
