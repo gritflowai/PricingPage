@@ -74,10 +74,28 @@ export interface QuoteErrorData {
   details?: any;
 }
 
+// App mode message types (for subscription management)
+export interface AppModeMessageData {
+  formId: string;
+  selectedPlan: string;
+  count: number;
+  isAnnual: boolean;
+  finalPrice: number;
+  priceBreakdown?: {
+    subtotal: number;
+    customDiscount: number;
+    annualSavings: number;
+    finalMonthlyPrice: number;
+  };
+  reason?: string; // For blocked updates
+}
+
 export interface IframeMessage {
   type: 'PRICING_SELECTION_UPDATE' | 'USER_ACTION' | 'IFRAME_READY' | 'ENTERPRISE_INQUIRY'
     | 'QUOTE_ID_READY' | 'QUOTE_SUMMARY_UPDATE' | 'QUOTE_LOCKED' | 'QUOTE_ACCEPT_INTENT'
-    | 'QUOTE_ACCEPTED' | 'QUOTE_ERROR';
+    | 'QUOTE_ACCEPTED' | 'QUOTE_ERROR'
+    // App mode message types
+    | 'PLAN_UPDATE_REQUESTED' | 'PLAN_UPDATED' | 'PLAN_UPDATE_BLOCKED';
   data?: PricingSelectionData | {
     action: 'START_FREE_TRIAL' | 'CONTACT_SALES' | 'SCHEDULE_MEETING';
     selections: Partial<PricingSelectionData>;
@@ -89,8 +107,15 @@ export interface IframeMessage {
 
 // Incoming message types from parent window
 export interface IncomingMessage {
-  type: 'CONFIRM_QUOTE_ACCEPTANCE' | 'SET_ADMIN_MODE' | 'INIT_QUOTE';
+  type: 'CONFIRM_QUOTE_ACCEPTANCE' | 'SET_ADMIN_MODE' | 'INIT_QUOTE' | 'INIT_SUBSCRIPTION';
   data?: {
+    // INIT_SUBSCRIPTION fields
+    subscriptionId?: string;
+    subscriptionStatus?: 'active' | 'locked';
+    currentPlan?: string;
+    currentCount?: number;
+    currentIsAnnual?: boolean;
+    lockedReason?: string;
     id?: string;
     acceptedAt?: string;
     enabled?: boolean;
@@ -263,7 +288,8 @@ export const useIframeMessaging = (options: UseIframeMessagingOptions = {}) => {
       // Handle known incoming message types
       if (event.data.type === 'CONFIRM_QUOTE_ACCEPTANCE' ||
           event.data.type === 'SET_ADMIN_MODE' ||
-          event.data.type === 'INIT_QUOTE') {
+          event.data.type === 'INIT_QUOTE' ||
+          event.data.type === 'INIT_SUBSCRIPTION') {
         setIncomingMessage(event.data as IncomingMessage);
       }
     };
@@ -302,6 +328,14 @@ export const useIframeMessaging = (options: UseIframeMessagingOptions = {}) => {
     });
   }, [sendMessage]);
 
+  // Helper function for sending app mode messages (subscription management)
+  const sendAppModeMessage = useCallback((
+    type: 'PLAN_UPDATE_REQUESTED' | 'PLAN_UPDATED' | 'PLAN_UPDATE_BLOCKED',
+    data: AppModeMessageData
+  ) => {
+    sendMessage({ type, data });
+  }, [sendMessage]);
+
   return {
     isInIframe: isInIframeRef.current,
     sendSelectionUpdate,
@@ -310,6 +344,7 @@ export const useIframeMessaging = (options: UseIframeMessagingOptions = {}) => {
     sendMessage,
     sendQuoteMessage,
     sendQuoteError,
+    sendAppModeMessage,
     incomingMessage,
   };
 };

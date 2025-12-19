@@ -112,12 +112,29 @@ export async function acceptQuote(
   id: string,
   email?: string
 ): Promise<Quote> {
-  return apiFetch<Quote>('/quotes/accept', {
+  console.log('[quoteApi.acceptQuote] 📤 Sending quote acceptance to API:', {
+    id,
+    email,
+    endpoint: '/quotes/accept',
+    timestamp: new Date().toISOString()
+  });
+
+  const result = await apiFetch<Quote>('/quotes/accept', {
     method: 'POST',
     body: JSON.stringify({
       id,
       accepted_at: new Date().toISOString(),
       email,
     }),
-  })
+  });
+
+  console.log('[quoteApi.acceptQuote] ✅ Quote acceptance API response:', {
+    quoteId: result.id,
+    status: result.status,
+    acceptedAt: result.accepted_at,
+    version: result.version,
+    timestamp: new Date().toISOString()
+  });
+
+  return result;
 }

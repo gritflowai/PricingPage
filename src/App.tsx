@@ -8,12 +8,13 @@ import Tooltip from './components/Tooltip';
 import RoleSelector from './components/RoleSelector';
 import FeatureComparison from './components/FeatureComparison';
 import { QuoteModeBanner } from './components/QuoteModeBanner';
+import { AppModeBanner, type AppModeStatus } from './components/AppModeBanner';
 import SocialProofBadges from './components/SocialProofBadges';
 import NudgeBanner from './components/NudgeBanner';
 import FormIdErrorBanner from './components/FormIdErrorBanner';
 import { ProfitSprintOffer } from './components/ProfitSprintOffer';
 import { SalesScriptPanel } from './components/SalesScriptPanel';
-import { AlertCircle, ChevronDown, Shield, CreditCard, RefreshCw, Copy, BarChart3, TrendingUp, DollarSign, FileText } from 'lucide-react';
+import { AlertCircle, ChevronDown, Shield, CreditCard, RefreshCw, Copy, BarChart3, TrendingUp, DollarSign, FileText, Lock, CheckCircle } from 'lucide-react';
 import { useIframeMessaging } from './hooks/useIframeMessaging';
 import { calculateCustomDiscount, type DiscountType } from './utils/discountCalculator';
 import { useQuoteMode } from './hooks/useQuoteMode';
@@ -123,8 +124,8 @@ function getEmbedConfig() {
     initialOnboardingFeeDescription: params.get('onboardingDesc') || null,
     // Projected locations parameter
     projectedLocations: params.has('projectedLocations') ? parseInt(params.get('projectedLocations')!, 10) : null,
-    // Quote mode parameters
-    mode: params.get('mode') || 'calculator',
+    // Mode parameters: 'calculator' (default), 'quote' (CRM), 'app' (subscription management)
+    mode: params.get('mode') || 'calculator',  // 'calculator' | 'quote' | 'app'
     formId: params.get('formId') || null,
     expiresInDays: parseInt(params.get('quoteExpiresInDays') || '14', 10),
     showPricingDetails: params.get('showPricingDetails') === 'true',
@@ -419,6 +420,18 @@ function App() {
   const [waitingForInit, setWaitingForInit] = useState(false);
   const [quoteLoadComplete, setQuoteLoadComplete] = useState(false); // Track if initial quote load is done
 
+  // App mode state (for existing customers managing subscriptions)
+  const [appMode, setAppMode] = useState(embedConfig.mode === 'app');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [savingPlan, setSavingPlan] = useState(false);
+  const [planSaved, setPlanSaved] = useState(false);
+  const [subscriptionLocked, setSubscriptionLocked] = useState(false); // Set from database on load
+  const [originalSelection, setOriginalSelection] = useState<{
+    selectedPlan: string;
+    count: number;
+    isAnnual: boolean;
+  } | null>(null);
+
   // Admin mode state (for salespeople)
   const [adminMode, setAdminMode] = useState(embedConfig.adminMode);
 
@@ -446,6 +459,7 @@ function App() {
     sendEnterpriseInquiry,
     sendQuoteMessage,
     sendQuoteError,
+    sendAppModeMessage,
     incomingMessage,
   } = useIframeMessaging({
     enabled: embedConfig.isEmbedded,
@@ -1448,34 +1462,70 @@ function App() {
   // Handle incoming CONFIRM_QUOTE_ACCEPTANCE message from parent
   useEffect(() => {
     if (!incomingMessage || incomingMessage.type !== 'CONFIRM_QUOTE_ACCEPTANCE') return;
-    if (!formId || quoteStatus !== 'locked') return;
+
+    console.log('[PricingCalculator] 📨 Received CONFIRM_QUOTE_ACCEPTANCE:', {
+      formId,
+      quoteStatus,
+      incomingData: incomingMessage.data,
+      timestamp: new Date().toISOString()
+    });
+
+    if (!formId) {
+      console.error('[PricingCalculator] ❌ Cannot accept quote: formId is missing');
+      return;
+    }
+
+    // Allow acceptance if quote is locked OR if we're in a valid acceptance state
+    if (quoteStatus !== 'locked' && quoteStatus !== 'draft') {
+      console.warn('[PricingCalculator] ⚠️ Cannot accept quote: status is', quoteStatus, '(expected locked or draft)');
+      return;
+    }
 
     const acceptQuote = async () => {
       try {
         // Update quote status to accepted in database
         const acceptedAt = incomingMessage.data?.acceptedAt || new Date().toISOString();
+        const email = incomingMessage.data?.email;
 
-        // Here you would call an API to mark the quote as accepted
-        // For now, we'll just update local state and send confirmation
+        console.log('[PricingCalculator] 💾 Calling quoteApi.acceptQuote() with:', {
+          formId,
+          acceptedAt,
+          email,
+          timestamp: new Date().toISOString()
+        });
+
+        // Call API to persist quote acceptance to database
+        const acceptedQuote = await quoteApi.acceptQuote(formId, email);
+
+        console.log('[PricingCalculator] ✅ quoteApi.acceptQuote() succeeded:', {
+          quoteId: acceptedQuote.id,
+          version: acceptedQuote.version,
+          status: acceptedQuote.status,
+          acceptedAt: acceptedQuote.accepted_at,
+          timestamp: new Date().toISOString()
+        });
+
+        // Update local state
         setQuoteStatus('accepted');
         setQuoteAcceptedAt(acceptedAt);
 
         // Send QUOTE_ACCEPTED confirmation back to parent
+        console.log('[PricingCalculator] 📤 Sending QUOTE_ACCEPTED to parent');
         sendQuoteMessage('QUOTE_ACCEPTED', {
           id: formId,
-          version: 2,
+          version: acceptedQuote.version || 2,
           status: 'accepted',
-          acceptedAt: acceptedAt,
+          acceptedAt: acceptedQuote.accepted_at || acceptedAt,
           pricingModelId: currentPricingModelId,
         });
 
-        console.log('[PricingCalculator] Quote accepted:', {
+        console.log('[PricingCalculator] ✅ Quote acceptance flow complete:', {
           formId,
-          acceptedAt,
+          acceptedAt: acceptedQuote.accepted_at,
           timestamp: new Date().toISOString()
         });
       } catch (error) {
-        console.error('Failed to accept quote:', error);
+        console.error('[PricingCalculator] ❌ Failed to accept quote:', error);
         sendQuoteError(
           error instanceof Error ? error.message : 'Failed to accept quote',
           'UNKNOWN',
@@ -1495,6 +1545,195 @@ function App() {
     setAdminMode(enabled);
     console.log('[PricingCalculator] Admin mode set to:', enabled);
   }, [incomingMessage]);
+
+  // Handle incoming INIT_SUBSCRIPTION message from parent (App Mode)
+  useEffect(() => {
+    if (!incomingMessage || incomingMessage.type !== 'INIT_SUBSCRIPTION') return;
+    if (!appMode) return;
+
+    const data = incomingMessage.data;
+    console.log('[PricingCalculator] Received INIT_SUBSCRIPTION message:', data);
+
+    // Set subscription locked status
+    if (data?.subscriptionStatus === 'locked') {
+      setSubscriptionLocked(true);
+    }
+
+    // Initialize original selection for change detection
+    if (data?.currentPlan && data?.currentCount !== undefined && data?.currentIsAnnual !== undefined) {
+      setOriginalSelection({
+        selectedPlan: data.currentPlan,
+        count: data.currentCount,
+        isAnnual: data.currentIsAnnual
+      });
+
+      // Set current values from subscription
+      setSelectedPlan(data.currentPlan as PlanType);
+      setCount(data.currentCount);
+      setIsAnnual(data.currentIsAnnual);
+    }
+
+    // Update formId if subscriptionId provided
+    if (data?.subscriptionId) {
+      setFormId(data.subscriptionId);
+    }
+  }, [incomingMessage, appMode]);
+
+  // App Mode: Change detection - track when user makes changes to their plan
+  useEffect(() => {
+    if (!appMode || !originalSelection) return;
+
+    const hasChanges =
+      selectedPlan !== originalSelection.selectedPlan ||
+      count !== originalSelection.count ||
+      isAnnual !== originalSelection.isAnnual;
+
+    setHasUnsavedChanges(hasChanges);
+
+    // Reset saved state if user makes new changes
+    if (hasChanges && planSaved) {
+      setPlanSaved(false);
+    }
+  }, [appMode, originalSelection, selectedPlan, count, isAnnual, planSaved]);
+
+  // App Mode: Initialize original selection when app mode loads
+  useEffect(() => {
+    if (!appMode || originalSelection) return;
+
+    // If we have a formId, fetch subscription data
+    // Otherwise, just set current values as original
+    if (formId) {
+      const fetchSubscription = async () => {
+        try {
+          console.log('[PricingCalculator] Fetching subscription data for app mode:', formId);
+          const quote = await quoteApi.getQuote(formId);
+
+          if (quote) {
+            const selections = typeof quote.selection_raw === 'string'
+              ? JSON.parse(quote.selection_raw)
+              : quote.selection_raw;
+
+            setOriginalSelection({
+              selectedPlan: selections?.selectedPlan || selectedPlan,
+              count: selections?.count || count,
+              isAnnual: selections?.isAnnual ?? isAnnual
+            });
+
+            // Set locked status from database
+            // In app mode, only 'locked' status prevents changes (accepted subscriptions can still be modified)
+            if (quote.status === 'locked') {
+              setSubscriptionLocked(true);
+              console.log('[PricingCalculator] Subscription is locked - modifications disabled');
+            }
+          }
+        } catch (error) {
+          console.error('[PricingCalculator] Failed to fetch subscription:', error);
+          // Fallback to current values
+          setOriginalSelection({ selectedPlan, count, isAnnual });
+        }
+      };
+
+      fetchSubscription();
+    } else {
+      // No formId, use current values as baseline
+      setOriginalSelection({ selectedPlan, count, isAnnual });
+    }
+  }, [appMode, formId, originalSelection, selectedPlan, count, isAnnual]);
+
+  // App Mode: Handle updating the plan
+  const handleUpdatePlan = async () => {
+    if (!formId || !hasUnsavedChanges || subscriptionLocked) return;
+
+    setSavingPlan(true);
+
+    // Notify parent that update is requested
+    sendAppModeMessage('PLAN_UPDATE_REQUESTED', {
+      formId,
+      selectedPlan,
+      count,
+      isAnnual,
+      finalPrice: grandTotal,
+      priceBreakdown: {
+        subtotal: totalPrice,
+        customDiscount: customDiscountAmount,
+        annualSavings: isAnnual ? priceBeforeAnnual * (2/12) : 0,
+        finalMonthlyPrice: finalPrice
+      }
+    });
+
+    try {
+      // Build summary object for saving
+      const summary = {
+        userType,
+        selectedPlan,
+        count,
+        isAnnual,
+        subscriptionPrice,
+        subscriptionPricePerUnit,
+        totalPrice,
+        finalPrice: grandTotal,
+        priceBreakdown: {
+          subtotal: totalPrice,
+          customDiscount: customDiscountAmount,
+          annualSavings: isAnnual ? priceBeforeAnnual * (2/12) : 0,
+          finalMonthlyPrice: finalPrice
+        },
+        planDetails: {
+          name: currentPlan.name,
+          connections: currentPlan.connections,
+          users: selectedPlan === 'ai-advisor' ? count : count * currentPlan.usersPerCompany,
+          scorecards: currentPlan.scorecardsPerCompany,
+          aiTokens: calculatedAiTokens
+        }
+      };
+
+      // Check if quote exists, create if not (App Mode may not have an existing quote)
+      try {
+        await quoteApi.getQuote(formId);
+      } catch (getError) {
+        // Quote doesn't exist, create it first
+        console.log('[PricingCalculator] Quote not found, creating new quote for app mode');
+        await quoteApi.initQuote({
+          id: formId,
+          selected_plan: selectedPlan,
+          count: count,
+          is_annual: isAnnual,
+        });
+      }
+
+      // Save to database
+      await quoteApi.updateQuote(formId, summary);
+
+      // Update original selection to new values
+      setOriginalSelection({ selectedPlan, count, isAnnual });
+      setHasUnsavedChanges(false);
+      setPlanSaved(true);
+      setSavingPlan(false);
+
+      // Notify parent of success
+      sendAppModeMessage('PLAN_UPDATED', {
+        formId,
+        selectedPlan,
+        count,
+        isAnnual,
+        finalPrice: grandTotal,
+        priceBreakdown: {
+          subtotal: totalPrice,
+          customDiscount: customDiscountAmount,
+          annualSavings: isAnnual ? priceBeforeAnnual * (2/12) : 0,
+          finalMonthlyPrice: finalPrice
+        }
+      });
+
+      // Reset planSaved after 3 seconds
+      setTimeout(() => setPlanSaved(false), 3000);
+
+    } catch (error) {
+      console.error('[PricingCalculator] Failed to update plan:', error);
+      setSavingPlan(false);
+      alert('Failed to update plan. Please try again.');
+    }
+  };
 
   // Handle incoming INIT_QUOTE message from parent
   useEffect(() => {
@@ -1690,6 +1929,23 @@ function App() {
 
       <div className={outerPadding}>
         <div className={`max-w-6xl mx-auto ${bottomMargin} ${topMargin}`}>
+        {/* App Mode Banner */}
+        {appMode && (
+          <AppModeBanner
+            status={
+              subscriptionLocked ? 'locked' :
+              savingPlan ? 'saving' :
+              planSaved ? 'saved' :
+              hasUnsavedChanges ? 'unsaved' :
+              'current'
+            }
+            onContactSales={() => {
+              setIsEnterpriseRequest(true);
+              setShowContactModal(true);
+            }}
+          />
+        )}
+
         {/* Quote Mode Banner */}
         {quoteMode && (
           <>
@@ -1997,9 +2253,77 @@ function App() {
                 )}
               </div>
 
-              {/* CTA Button - Quote Mode or Calculator Mode */}
+              {/* CTA Button - App Mode, Quote Mode, or Calculator Mode */}
               <div className="mb-4">
-                {quoteMode ? (
+                {appMode ? (
+                  // App Mode Buttons (Subscription Management)
+                  <>
+                    {subscriptionLocked ? (
+                      // Locked subscription - Contact Sales
+                      <button
+                        onClick={() => {
+                          sendAppModeMessage('PLAN_UPDATE_BLOCKED', {
+                            formId: formId || '',
+                            selectedPlan,
+                            count,
+                            isAnnual,
+                            finalPrice: grandTotal,
+                            reason: 'Subscription is locked'
+                          });
+                          // Open contact modal or redirect
+                          setShowContactModal(true);
+                        }}
+                        className="w-full bg-orange-500 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-orange-600 smooth-transition transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                      >
+                        <Lock className="w-5 h-5" />
+                        Contact Sales to Update Plan
+                      </button>
+                    ) : planSaved ? (
+                      // Just saved successfully
+                      <div className="w-full bg-green-50 border-2 border-green-500 px-6 py-3 rounded-lg text-lg font-semibold text-green-800 text-center flex items-center justify-center gap-2">
+                        <CheckCircle className="w-5 h-5" />
+                        Plan Updated Successfully
+                      </div>
+                    ) : savingPlan ? (
+                      // Saving in progress
+                      <button
+                        disabled
+                        className="w-full bg-[#1239FF]/70 text-white px-6 py-3 rounded-lg text-lg font-semibold cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Saving Changes...
+                      </button>
+                    ) : hasUnsavedChanges ? (
+                      // Has unsaved changes - Update My Plan button
+                      <button
+                        onClick={handleUpdatePlan}
+                        className="w-full bg-[#1239FF] text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-[#0F2DB8] smooth-transition transform hover:scale-[1.02] shadow-lg hover:shadow-xl"
+                      >
+                        Update My Plan
+                      </button>
+                    ) : (
+                      // No changes - Current Plan (disabled)
+                      <button
+                        disabled
+                        className="w-full bg-gray-200 text-gray-500 px-6 py-3 rounded-lg text-lg font-semibold cursor-not-allowed"
+                      >
+                        Current Plan
+                      </button>
+                    )}
+
+                    {/* App Mode Trust Badges */}
+                    <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-4 text-xs text-[#180D43]/60">
+                      <span className="flex items-center gap-1">
+                        <Shield className="w-3 h-3" />
+                        Changes take effect immediately
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <RefreshCw className="w-3 h-3" />
+                        Prorated billing
+                      </span>
+                    </div>
+                  </>
+                ) : quoteMode ? (
                   // Quote Mode Buttons
                   <>
                     {quoteStatus === 'draft' && (

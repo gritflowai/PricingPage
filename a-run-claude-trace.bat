@@ -1,0 +1,2 @@
+@echo off
+wt -d C:\repos\AI-Growth-Advisor-Onboarding-Form powershell -NoExit -Command "claude-trace --claude-path 'C:/Users/bmper/AppData/Roaming/npm/node_modules/@anthropic-ai/claude-code/cli.js' --run-with --dangerously-skip-permissions"
