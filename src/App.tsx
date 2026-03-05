@@ -2456,6 +2456,8 @@ function App() {
 
                     <a
                       href="https://auth.autymate.com/Register"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       onClick={() => {
                         sendUserAction('START_FREE_TRIAL', {
                           userType,
@@ -3061,6 +3063,7 @@ function App() {
         count={isEnterpriseRequest ? 0 : count}
         planName={isEnterpriseRequest ? "Enterprise" : currentPlan.name}
         unitLabel={selectedPlan === 'ai-advisor' ? 'users' : terminology.plural}
+        isInIframe={isInIframe}
         userData={{
           formId: formId || undefined
         }}
