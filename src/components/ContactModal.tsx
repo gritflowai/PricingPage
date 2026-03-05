@@ -107,64 +107,21 @@ const ContactModal: React.FC<ContactModalProps> = ({
 
     if (isInIframe) {
       // When inside an iframe, Apollo's popup/overlay gets blocked by cross-origin restrictions.
-      // Open a new popup window where Apollo can run without iframe constraints.
+      // Open a full new tab to our own domain with booking params — Apollo works natively there.
+      // This is mobile-friendly (no popup blockers) and shows a clean branded URL.
       const formData = new FormData(e.currentTarget);
-      const email = formData.get('email') || '';
-      const firstName = formData.get('firstName') || '';
-      const lastName = formData.get('lastName') || '';
-      const formId = formData.get('formId') || '';
-      const sessionLength = formData.get('sessionLength') || '';
+      const params = new URLSearchParams({
+        bookMeeting: 'true',
+        email: String(formData.get('email') || ''),
+        firstName: String(formData.get('firstName') || ''),
+        lastName: String(formData.get('lastName') || ''),
+        formId: String(formData.get('formId') || ''),
+        sessionLength: String(formData.get('sessionLength') || ''),
+      });
 
-      const popup = window.open('', 'apollo-booking', 'width=700,height=750,scrollbars=yes');
-      if (popup) {
-        popup.document.write(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Book a Meeting - Autymate</title>
-  <style>
-    body { font-family: 'Inter', -apple-system, sans-serif; margin: 0; padding: 20px; background: #f8f9fa; }
-    .container { max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-    h2 { color: #1239FF; margin-top: 0; }
-    .loading { text-align: center; padding: 40px; color: #666; }
-    .loading::after { content: ''; display: block; width: 30px; height: 30px; margin: 16px auto 0; border: 3px solid #e0e0e0; border-top-color: #1239FF; border-radius: 50%; animation: spin 0.8s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h2>Book a Meeting</h2>
-    <div class="loading">Loading scheduling calendar...</div>
-    <form id="enterprise-meeting-form" style="display:none">
-      <input type="hidden" name="email" value="${String(email).replace(/"/g, '&quot;')}" />
-      <input type="hidden" name="firstName" value="${String(firstName).replace(/"/g, '&quot;')}" />
-      <input type="hidden" name="lastName" value="${String(lastName).replace(/"/g, '&quot;')}" />
-      <input type="hidden" name="formId" value="${String(formId).replace(/"/g, '&quot;')}" />
-      <input type="hidden" name="sessionLength" value="${String(sessionLength).replace(/"/g, '&quot;')}" />
-    </form>
-  </div>
-  <script>
-    var script = document.createElement('script');
-    script.src = 'https://assets.apollo.io/js/meetings/meetings-widget.js';
-    script.defer = true;
-    script.onload = function() {
-      if (window.ApolloMeetings) {
-        window.ApolloMeetings.initWidget({
-          appId: '68e735c5cdb1cc001d0540a1',
-          schedulingLink: 'yq4-brh-gyj'
-        });
-        setTimeout(function() {
-          window.ApolloMeetings.submit({ formId: 'enterprise-meeting-form' });
-        }, 500);
-      }
-    };
-    document.head.appendChild(script);
-  </script>
-</body>
-</html>`);
-        popup.document.close();
-      }
+      // Get the base URL of the pricing app (same origin as iframe src)
+      const baseUrl = window.location.origin;
+      window.open(`${baseUrl}/?${params.toString()}`, '_blank');
 
       // Close the modal
       setShowSchedulingForm(false);
