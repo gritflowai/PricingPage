@@ -25,3 +25,5 @@ dist-ssr
 
 # Windows null file
 nul
+.vercel
+.env*.local
