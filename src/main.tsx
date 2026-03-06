@@ -16,7 +16,6 @@ createRoot(document.getElementById('root')!).render(
         firstName={params.get('firstName') || ''}
         lastName={params.get('lastName') || ''}
         formId={params.get('formId') || undefined}
-        sessionLength={params.get('sessionLength') || undefined}
       />
     ) : (
       <App />

@@ -19,7 +19,6 @@ interface BookMeetingProps {
   firstName: string;
   lastName: string;
   formId?: string;
-  sessionLength?: string;
 }
 
 const BookMeeting: React.FC<BookMeetingProps> = ({
@@ -27,7 +26,6 @@ const BookMeeting: React.FC<BookMeetingProps> = ({
   firstName,
   lastName,
   formId,
-  sessionLength,
 }) => {
   const [apolloReady, setApolloReady] = useState(false);
   const [calendarShown, setCalendarShown] = useState(false);
@@ -101,7 +99,7 @@ const BookMeeting: React.FC<BookMeetingProps> = ({
               <div className="space-y-3 mb-6">
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Clock className="w-4 h-4 text-gray-400" />
-                  <span>{sessionLength || '60 min'}</span>
+                  <span>60 min</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Users className="w-4 h-4 text-gray-400" />
@@ -171,7 +169,6 @@ const BookMeeting: React.FC<BookMeetingProps> = ({
                 <input type="hidden" name="firstName" value={firstName} />
                 <input type="hidden" name="lastName" value={lastName} />
                 {formId && <input type="hidden" name="formId" value={formId} />}
-                {sessionLength && <input type="hidden" name="sessionLength" value={sessionLength} />}
               </form>
 
               {/* Loading state while Apollo loads */}

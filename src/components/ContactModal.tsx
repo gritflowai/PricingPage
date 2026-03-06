@@ -116,7 +116,6 @@ const ContactModal: React.FC<ContactModalProps> = ({
         firstName: String(formData.get('firstName') || ''),
         lastName: String(formData.get('lastName') || ''),
         formId: String(formData.get('formId') || ''),
-        sessionLength: String(formData.get('sessionLength') || ''),
       });
 
       // Get the base URL of the pricing app (same origin as iframe src)
@@ -233,29 +232,16 @@ const ContactModal: React.FC<ContactModalProps> = ({
                   defaultValue={userData?.formId || ''}
                 />
 
-                {/* Session Length Dropdown */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Session Length <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="sessionLength"
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1239FF] focus:border-transparent outline-none bg-white"
-                  >
-                    <option value="60 min – 📋 Strategy Session (Whiteboard planning + Setup roadmap)">
-                      60 min – 📋 Strategy Session (Whiteboard planning)
-                    </option>
-                    <option value="45 min – 🚀 Deep-Dive (Recommended) (Technical setup planning)">
-                      45 min – 🚀 Deep-Dive (Recommended)
-                    </option>
-                    <option value="30 min – 🎯 Focus Session (Quick-win strategy + Setup basics)">
-                      30 min – 🎯 Focus Session
-                    </option>
-                    <option value="15 min – ⚡ Quick Strategy Discovery Session">
-                      15 min – ⚡ Quick Discovery
-                    </option>
-                  </select>
+                {/* Session info - fixed to match Apollo scheduling link (yq4-brh-gyj = 60 min Strategy Session).
+                    To support multiple durations, configure separate scheduling links in Apollo dashboard
+                    and add a mapping here. */}
+                <input type="hidden" name="sessionLength" value="60 min" />
+                <div className="bg-blue-50 rounded-lg p-3 flex items-center gap-3">
+                  <Calendar className="w-5 h-5 text-[#1239FF] flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-[#180D43]">60 min — Strategy Session</p>
+                    <p className="text-xs text-gray-500">Whiteboard planning + Setup roadmap</p>
+                  </div>
                 </div>
 
                 {/* Submit Button */}

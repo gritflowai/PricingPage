@@ -36,7 +36,11 @@ test.describe('Production Tests - Desktop', () => {
   });
 
   test('2. Book Meeting flow opens branded booking page with Apollo calendar', async ({ page, context }) => {
-    await page.goto(PRICING_URL, { waitUntil: 'networkidle', timeout: 30000 });
+    test.setTimeout(120000);
+    await page.goto(PRICING_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+    // Wait for iframe to load
+    await page.waitForTimeout(5000);
 
     // Remove consent overlays
     await page.evaluate(() => {
@@ -46,12 +50,18 @@ test.describe('Production Tests - Desktop', () => {
       });
     });
 
-    const pricingFrame = page.frames().find(f => f.url().includes('pricing.auty.io'));
+    // Wait for the pricing iframe to appear
+    let pricingFrame = page.frames().find(f => f.url().includes('pricing.auty.io'));
+    if (!pricingFrame) {
+      // iframe may not be ready yet; wait and retry
+      await page.waitForTimeout(5000);
+      pricingFrame = page.frames().find(f => f.url().includes('pricing.auty.io'));
+    }
     expect(pricingFrame).toBeTruthy();
 
     // Set slider to 51+ to trigger enterprise modal
     const slider = pricingFrame!.locator('input[type="range"]');
-    await expect(slider).toBeVisible({ timeout: 10000 });
+    await expect(slider).toBeVisible({ timeout: 15000 });
     await slider.fill('51');
     await page.waitForTimeout(2000);
 
@@ -59,9 +69,10 @@ test.describe('Production Tests - Desktop', () => {
     const getQuoteBtn = pricingFrame!.locator('button:has-text("Get My Custom Quote")');
     await expect(getQuoteBtn).toBeVisible({ timeout: 5000 });
     await getQuoteBtn.click({ force: true });
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000);
 
     // Fill booking form
+    await expect(pricingFrame!.locator('input[name="email"]')).toBeVisible({ timeout: 10000 });
     await pricingFrame!.locator('input[name="email"]').fill('enterprise@acme.com');
     await pricingFrame!.locator('input[name="firstName"]').fill('Jane');
     await pricingFrame!.locator('input[name="lastName"]').fill('Smith');
@@ -104,7 +115,7 @@ test.describe('Production Tests - Desktop', () => {
   });
 
   test('3. Booking page works as direct URL', async ({ page }) => {
-    await page.goto('https://pricing.auty.io/?bookMeeting=true&email=ceo@startup.io&firstName=Alex&lastName=Chen&sessionLength=30+min', {
+    await page.goto('https://pricing.auty.io/?bookMeeting=true&email=ceo@startup.io&firstName=Alex&lastName=Chen', {
       waitUntil: 'networkidle',
       timeout: 30000,
     });
@@ -114,7 +125,7 @@ test.describe('Production Tests - Desktop', () => {
     await expect(page.locator('text=Strategy Session')).toBeVisible();
     await expect(page.locator('text=Alex Chen')).toBeVisible();
     await expect(page.locator('text=ceo@startup.io')).toBeVisible();
-    await expect(page.locator('text=30 min')).toBeVisible();
+    await expect(page.locator('text=60 min')).toBeVisible();
 
     // Verify hidden form has correct values
     const emailVal = await page.locator('#booking-form input[name="email"]').getAttribute('value');
@@ -159,7 +170,7 @@ test.describe('Production Tests - Mobile', () => {
     const context = await browser.newContext({ ...iPhone });
     const page = await context.newPage();
 
-    await page.goto('https://pricing.auty.io/?bookMeeting=true&email=mobile@test.com&firstName=Mobile&lastName=User&sessionLength=15+min', {
+    await page.goto('https://pricing.auty.io/?bookMeeting=true&email=mobile@test.com&firstName=Mobile&lastName=User', {
       waitUntil: 'networkidle',
       timeout: 30000,
     });

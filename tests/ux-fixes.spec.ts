@@ -32,8 +32,14 @@ test.describe('UX Fixes Verification', () => {
     await expect(pricingFrame!.locator('input[name="email"]')).toBeVisible({ timeout: 10000 });
     await expect(pricingFrame!.locator('input[name="firstName"]')).toBeVisible();
     await expect(pricingFrame!.locator('input[name="lastName"]')).toBeVisible();
-    await expect(pricingFrame!.locator('select[name="sessionLength"]')).toBeVisible();
     await expect(pricingFrame!.locator('button:has-text("Book Meeting")')).toBeVisible();
+
+    // Session length dropdown should NOT exist (replaced with fixed 60-min info display)
+    const sessionDropdown = pricingFrame!.locator('select[name="sessionLength"]');
+    expect(await sessionDropdown.count()).toBe(0);
+    // Should show fixed "60 min — Strategy Session" info instead
+    await expect(pricingFrame!.locator('text=60 min — Strategy Session')).toBeVisible();
+    console.log('PASS: Session length dropdown removed, fixed 60-min info shown');
 
     // Verify "Onboarding Form ID" label is NOT visible
     const formIdLabel = pricingFrame!.locator('text=Onboarding Form ID');
