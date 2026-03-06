@@ -168,6 +168,7 @@ const BookMeeting: React.FC<BookMeetingProps> = ({
                 <input type="hidden" name="email" value={email} />
                 <input type="hidden" name="firstName" value={firstName} />
                 <input type="hidden" name="lastName" value={lastName} />
+                <input type="hidden" name="sessionLength" value="60 min – Strategy Whiteboarding Session" />
                 {formId && <input type="hidden" name="formId" value={formId} />}
               </form>
 

@@ -235,7 +235,7 @@ const ContactModal: React.FC<ContactModalProps> = ({
                 {/* Session info - fixed to match Apollo scheduling link (yq4-brh-gyj = 60 min Strategy Session).
                     To support multiple durations, configure separate scheduling links in Apollo dashboard
                     and add a mapping here. */}
-                <input type="hidden" name="sessionLength" value="60 min" />
+                <input type="hidden" name="sessionLength" value="60 min – Strategy Whiteboarding Session" />
                 <div className="bg-blue-50 rounded-lg p-3 flex items-center gap-3">
                   <Calendar className="w-5 h-5 text-[#1239FF] flex-shrink-0" />
                   <div>
