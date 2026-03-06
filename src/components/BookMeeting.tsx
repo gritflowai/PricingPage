@@ -153,12 +153,17 @@ const BookMeeting: React.FC<BookMeetingProps> = ({
           {/* Right Column: Calendar Area */}
           <div className="md:col-span-2">
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 min-h-[500px]">
-              <h3 className="text-xl font-bold text-[#180D43] mb-1">
-                Select a Date & Time
-              </h3>
-              <p className="text-sm text-gray-500 mb-6">
-                Pick a time that works best for you. We'll send a calendar invite with a video call link.
-              </p>
+              {/* Only show heading before Apollo calendar takes over */}
+              {!calendarShown && (
+                <>
+                  <h3 className="text-xl font-bold text-[#180D43] mb-1">
+                    Select a Date & Time
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-6">
+                    Pick a time that works best for you. We'll send a calendar invite with a video call link.
+                  </p>
+                </>
+              )}
 
               {/* Hidden form for Apollo to read */}
               <form id="booking-form" style={{ display: 'none' }}>

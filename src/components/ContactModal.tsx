@@ -226,23 +226,12 @@ const ContactModal: React.FC<ContactModalProps> = ({
                   />
                 </div>
 
-                {/* Onboarding Form ID Field */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Onboarding Form ID
-                  </label>
-                  <input
-                    type="text"
-                    name="formId"
-                    defaultValue={userData?.formId || ''}
-                    readOnly={!!userData?.formId}
-                    className={`w-full px-4 py-2 border border-gray-300 rounded-lg outline-none ${
-                      userData?.formId
-                        ? 'bg-gray-50 text-gray-600 cursor-default'
-                        : 'focus:ring-2 focus:ring-[#1239FF] focus:border-transparent'
-                    }`}
-                  />
-                </div>
+                {/* Onboarding Form ID - hidden from user, passed automatically */}
+                <input
+                  type="hidden"
+                  name="formId"
+                  defaultValue={userData?.formId || ''}
+                />
 
                 {/* Session Length Dropdown */}
                 <div>
